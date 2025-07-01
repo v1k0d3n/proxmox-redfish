@@ -10,7 +10,7 @@ Environment="PROXMOX_NODE=pve"
 Environment="REDFISH_LOGGING_ENABLED=True"
 Environment="REDFISH_LOG_LEVEL=INFO"
 Environment="PROXMOX_ISO_STORAGE=local"
-ExecStart=/opt/proxmox-redfish/venv/bin/python /opt/proxmox-redfish/src/proxmox_redfish/proxmox_redfish.py -A None
+ExecStart=/opt/proxmox-redfish/venv/bin/python /opt/proxmox-redfish/src/proxmox_redfish/proxmox_redfish.py
 WorkingDirectory=/opt/proxmox-redfish
 Restart=always
 Type=simple
