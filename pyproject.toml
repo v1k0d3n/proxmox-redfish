@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "proxmox-redfish"
+version = "0.1.0"
+description = "Redfish API daemon for Proxmox VMs"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [
+    {name = "Brandon B. Jozsa", email = "bjozsa@redhat.com"}
+]
+maintainers = [
+    {name = "Brandon B. Jozsa", email = "bjozsa@redhat.com"}
+]
+keywords = ["redfish", "proxmox", "api", "daemon"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+dependencies = [
+    "requests",
+    "requests_toolbelt",
+    "proxmoxer",
+]
+
+[project.urls]
+Homepage = "https://github.com/v1k0d3n/proxmox-redfish"
+Repository = "https://github.com/v1k0d3n/proxmox-redfish"
+Documentation = "https://github.com/v1k0d3n/proxmox-redfish/README.md"
+
+[project.scripts]
+proxmox-redfish = "proxmox_redfish.proxmox_redfish:main"
+
+[tool.setuptools.packages.find]
+where = ["src"] 
