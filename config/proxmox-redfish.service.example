@@ -3,6 +3,9 @@ Description=Proxmox-Redfish Daemon for Proxmox VM Control
 After=network.target
 
 [Service]
+Type=simple
+User=root
+Group=root
 Environment="PROXMOX_HOST=192.168.1.55"
 Environment="PROXMOX_USER=YOUR_USER@pam"
 Environment="PROXMOX_PASSWORD=YOUR_USER_PASSWORD_HERE"
@@ -10,7 +13,9 @@ Environment="PROXMOX_NODE=pve"
 Environment="REDFISH_LOGGING_ENABLED=True"
 Environment="REDFISH_LOG_LEVEL=INFO"
 Environment="PROXMOX_ISO_STORAGE=local"
-ExecStart=/opt/proxmox-redfish/venv/bin/python /opt/proxmox-redfish/src/proxmox_redfish/proxmox_redfish.py
+Environment="SSL_CERT_FILE=/opt/proxmox-redfish/config/ssl/server.crt"
+Environment="SSL_KEY_FILE=/opt/proxmox-redfish/config/ssl/server.key"
+ExecStart=/opt/proxmox-redfish/venv/bin/python /opt/proxmox-redfish/src/proxmox_redfish/proxmox_redfish.py --port 8000
 WorkingDirectory=/opt/proxmox-redfish
 Restart=always
 Type=simple

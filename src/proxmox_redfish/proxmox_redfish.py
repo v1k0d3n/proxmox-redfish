@@ -87,7 +87,7 @@ SSL_CA_FILE = os.getenv("SSL_CA_FILE", "/opt/redfish_daemon/config/ssl/ca.crt") 
 # Options
 # -A <Authn>, --Auth <Authn> -- Authentication type to use:  Authn={ None | Basic | Session (default) }
 # -S <Secure>, --Secure=<Secure> -- <Secure>={ None | Always (default) }
-AUTH = "Session"
+AUTH = "Basic"
 SECURE = "Always"
 
 # In-memory session store
@@ -2139,19 +2139,21 @@ def main():
         logger.info(f"Proxmox Host: {proxmox_config['host']}")
         logger.info(f"Redfish Port: {config['redfish']['port']}")
         
-        # Initialize and start the daemon
-        # Note: You'll need to implement the actual daemon startup logic here
-        # based on your existing code structure
+        # Check if SSL certificates are configured
+        ssl_cert = config.get('redfish', {}).get('ssl_cert')
+        ssl_key = config.get('redfish', {}).get('ssl_key')
         
-        logger.info("Proxmox Redfish Daemon started successfully")
-        
-        # Keep the daemon running
-        try:
-            while True:
-                import time
-                time.sleep(1)
-        except KeyboardInterrupt:
-            logger.info("Shutting down Proxmox Redfish Daemon...")
+        if ssl_cert and ssl_key:
+            # Start SSL server
+            logger.info("Starting Redfish server with SSL...")
+            run_server_ssl(config['redfish']['port'])
+        else:
+            # Start regular HTTP server
+            logger.info("Starting Redfish server without SSL...")
+            run_server(config['redfish']['port'])
+            
+    except KeyboardInterrupt:
+        logger.info("Shutting down Proxmox Redfish Daemon...")
             
     except Exception as e:
         logger.error(f"Failed to start daemon: {e}")
