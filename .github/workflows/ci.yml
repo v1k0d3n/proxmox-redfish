@@ -38,6 +38,8 @@ jobs:
         pip install -r requirements.txt
         echo "Installing development dependencies..."
         pip install -r requirements-dev.txt
+        echo "Installing package in development mode..."
+        pip install -e .
         echo "Installed packages:"
         pip list
 
@@ -62,6 +64,16 @@ jobs:
     - name: Run unit tests
       run: |
         echo "Running unit tests..."
+        echo "Python version: $(python --version)"
+        echo "Current directory: $(pwd)"
+        echo "Test files found:"
+        find tests/ -name "*.py" -type f
+        echo "Installed packages:"
+        pip list | grep -E "(pytest|mock|coverage)"
+        echo "Testing basic pytest functionality..."
+        python -c "import pytest; print('pytest imported successfully')"
+        echo "Testing basic proxmox_redfish import..."
+        python -c "import proxmox_redfish; print('proxmox_redfish imported successfully')"
         pytest tests/unit/ -v --cov=src/proxmox_redfish --cov-report=xml --cov-report=term-missing
 
     - name: Run integration tests
