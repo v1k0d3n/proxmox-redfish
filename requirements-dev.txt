@@ -9,6 +9,9 @@ isort>=5.12.0
 flake8>=6.0.0
 mypy>=1.0.0
 
+# Type stubs for mypy
+types-requests>=2.25.0
+
 # Security
 bandit>=1.7.0
 safety>=2.3.0

@@ -53,7 +53,11 @@ jobs:
     - name: Run type checking
       run: |
         echo "Running mypy..."
-        mypy src/ --ignore-missing-imports --no-strict-optional
+        echo "Python version: $(python --version)"
+        echo "Mypy version: $(mypy --version)"
+        echo "Installed packages:"
+        pip list | grep -E "(mypy|types-)"
+        mypy src/ --ignore-missing-imports --no-strict-optional --show-error-codes
 
     - name: Run unit tests
       run: |
