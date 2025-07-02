@@ -101,7 +101,9 @@ iso_file_locks = {}
 iso_file_locks_lock = threading.Lock()
 
 
-def handle_proxmox_error(operation: str, exception: Exception, vm_id: Optional[Union[str, int]] = None) -> Tuple[Dict[str, Any], int]:
+def handle_proxmox_error(
+    operation: str, exception: Exception, vm_id: Optional[Union[str, int]] = None
+) -> Tuple[Dict[str, Any], int]:
     """
     Handle Proxmox API exceptions and return a Redfish-compliant error response.
 
@@ -676,7 +678,9 @@ def _ensure_iso_available(proxmox: ProxmoxAPI, url_or_volid: str) -> str:
 
 
 # Add this new function to manage VirtualMedia state (replaces manage_virtual_cd)
-def manage_virtual_media(proxmox: ProxmoxAPI, vm_id: int, action: str, iso_path: Optional[str] = None) -> Tuple[Dict[str, Any], int]:
+def manage_virtual_media(
+    proxmox: ProxmoxAPI, vm_id: int, action: str, iso_path: Optional[str] = None
+) -> Tuple[Dict[str, Any], int]:
     """
     Manage virtual media for a Proxmox VM, mapped to Redfish VirtualMedia actions.
 
@@ -938,7 +942,9 @@ def get_vm_config(proxmox: ProxmoxAPI, vm_id: int) -> Union[Dict[str, Any], Tupl
     try:
         config = proxmox.nodes(PROXMOX_NODE).qemu(vm_id).config.get()
         if config is None:
-            return handle_proxmox_error("Configuration retrieval", Exception("Failed to retrieve VM configuration"), vm_id)
+            return handle_proxmox_error(
+                "Configuration retrieval", Exception("Failed to retrieve VM configuration"), vm_id
+            )
         return {
             "Name": config.get("name", f"VM-{vm_id}"),
             "MemoryMB": config.get("memory", 0),
@@ -990,7 +996,9 @@ def get_processor_collection(proxmox: ProxmoxAPI, vm_id: int) -> Union[Dict[str,
     try:
         config = proxmox.nodes(PROXMOX_NODE).qemu(vm_id).config.get()
         if config is None:
-            return handle_proxmox_error("Processor collection retrieval", Exception("Failed to retrieve VM configuration"), vm_id)
+            return handle_proxmox_error(
+                "Processor collection retrieval", Exception("Failed to retrieve VM configuration"), vm_id
+            )
         # Removed unused variables 'cores' and 'sockets'
         response = {
             "@odata.id": f"/redfish/v1/Systems/{vm_id}/Processors",
@@ -1004,11 +1012,15 @@ def get_processor_collection(proxmox: ProxmoxAPI, vm_id: int) -> Union[Dict[str,
         return handle_proxmox_error("Processor collection retrieval", e, vm_id)
 
 
-def get_processor_detail(proxmox: ProxmoxAPI, vm_id: int, processor_id: str) -> Union[Dict[str, Any], Tuple[Dict[str, Any], int]]:
+def get_processor_detail(
+    proxmox: ProxmoxAPI, vm_id: int, processor_id: str
+) -> Union[Dict[str, Any], Tuple[Dict[str, Any], int]]:
     try:
         config = proxmox.nodes(PROXMOX_NODE).qemu(vm_id).config.get()
         if config is None:
-            return handle_proxmox_error("Processor detail retrieval", Exception("Failed to retrieve VM configuration"), vm_id)
+            return handle_proxmox_error(
+                "Processor detail retrieval", Exception("Failed to retrieve VM configuration"), vm_id
+            )
         cores = config.get("cores", 1)
         sockets = config.get("sockets", 1)
         total_cores = cores * sockets
@@ -1074,7 +1086,9 @@ def parse_disk_size(drive_info: Dict[str, Any]) -> str:
         return "0"
 
 
-def get_storage_detail(proxmox: ProxmoxAPI, vm_id: int, storage_id: str) -> Union[Dict[str, Any], Tuple[Dict[str, Any], int]]:
+def get_storage_detail(
+    proxmox: ProxmoxAPI, vm_id: int, storage_id: str
+) -> Union[Dict[str, Any], Tuple[Dict[str, Any], int]]:
     try:
         if storage_id != "1":
             return {
@@ -1083,7 +1097,9 @@ def get_storage_detail(proxmox: ProxmoxAPI, vm_id: int, storage_id: str) -> Unio
 
         config = proxmox.nodes(PROXMOX_NODE).qemu(vm_id).config.get()
         if config is None:
-            return handle_proxmox_error("Storage detail retrieval", Exception("Failed to retrieve VM configuration"), vm_id)
+            return handle_proxmox_error(
+                "Storage detail retrieval", Exception("Failed to retrieve VM configuration"), vm_id
+            )
 
         # Get disk drives from config
         drives = []
@@ -1107,7 +1123,9 @@ def get_storage_detail(proxmox: ProxmoxAPI, vm_id: int, storage_id: str) -> Unio
         return handle_proxmox_error("Storage detail retrieval", e, vm_id)
 
 
-def get_drive_detail(proxmox: ProxmoxAPI, vm_id: int, storage_id: str, drive_id: str) -> Union[Dict[str, Any], Tuple[Dict[str, Any], int]]:
+def get_drive_detail(
+    proxmox: ProxmoxAPI, vm_id: int, storage_id: str, drive_id: str
+) -> Union[Dict[str, Any], Tuple[Dict[str, Any], int]]:
     try:
         if storage_id != "1":
             return {
@@ -1116,12 +1134,12 @@ def get_drive_detail(proxmox: ProxmoxAPI, vm_id: int, storage_id: str, drive_id:
 
         config = proxmox.nodes(PROXMOX_NODE).qemu(vm_id).config.get()
         if config is None:
-            return handle_proxmox_error("Drive detail retrieval", Exception("Failed to retrieve VM configuration"), vm_id)
+            return handle_proxmox_error(
+                "Drive detail retrieval", Exception("Failed to retrieve VM configuration"), vm_id
+            )
 
         if drive_id not in config:
-            return {
-                "error": {"code": "Base.1.0.ResourceMissingAtURI", "message": f"Drive {drive_id} not found"}
-            }, 404
+            return {"error": {"code": "Base.1.0.ResourceMissingAtURI", "message": f"Drive {drive_id} not found"}}, 404
 
         drive_config = config[drive_id]
         size = parse_disk_size({"size": drive_config})
@@ -1139,7 +1157,9 @@ def get_drive_detail(proxmox: ProxmoxAPI, vm_id: int, storage_id: str, drive_id:
         return handle_proxmox_error("Drive detail retrieval", e, vm_id)
 
 
-def get_volume_collection(proxmox: ProxmoxAPI, vm_id: int, storage_id: str) -> Union[Dict[str, Any], Tuple[Dict[str, Any], int]]:
+def get_volume_collection(
+    proxmox: ProxmoxAPI, vm_id: int, storage_id: str
+) -> Union[Dict[str, Any], Tuple[Dict[str, Any], int]]:
     try:
         if storage_id != "1":
             return {
@@ -1148,7 +1168,9 @@ def get_volume_collection(proxmox: ProxmoxAPI, vm_id: int, storage_id: str) -> U
 
         config = proxmox.nodes(PROXMOX_NODE).qemu(vm_id).config.get()
         if config is None:
-            return handle_proxmox_error("Volume collection retrieval", Exception("Failed to retrieve VM configuration"), vm_id)
+            return handle_proxmox_error(
+                "Volume collection retrieval", Exception("Failed to retrieve VM configuration"), vm_id
+            )
 
         # Get volumes from config
         volumes = []
@@ -1170,7 +1192,9 @@ def get_volume_collection(proxmox: ProxmoxAPI, vm_id: int, storage_id: str) -> U
         return handle_proxmox_error("Volume collection retrieval", e, vm_id)
 
 
-def get_controller_collection(proxmox: ProxmoxAPI, vm_id: int, storage_id: str) -> Union[Dict[str, Any], Tuple[Dict[str, Any], int]]:
+def get_controller_collection(
+    proxmox: ProxmoxAPI, vm_id: int, storage_id: str
+) -> Union[Dict[str, Any], Tuple[Dict[str, Any], int]]:
     try:
         if storage_id != "1":
             return {
@@ -1179,7 +1203,9 @@ def get_controller_collection(proxmox: ProxmoxAPI, vm_id: int, storage_id: str) 
 
         config = proxmox.nodes(PROXMOX_NODE).qemu(vm_id).config.get()
         if config is None:
-            return handle_proxmox_error("Controller collection retrieval", Exception("Failed to retrieve VM configuration"), vm_id)
+            return handle_proxmox_error(
+                "Controller collection retrieval", Exception("Failed to retrieve VM configuration"), vm_id
+            )
 
         # Get controllers from config
         controllers = []
@@ -1187,7 +1213,9 @@ def get_controller_collection(proxmox: ProxmoxAPI, vm_id: int, storage_id: str) 
             for i in range(4):
                 dev_key = f"{dev_type}{i}"
                 if dev_key in config:
-                    controllers.append({"@odata.id": f"/redfish/v1/Systems/{vm_id}/Storage/{storage_id}/Controllers/{dev_type}"})
+                    controllers.append(
+                        {"@odata.id": f"/redfish/v1/Systems/{vm_id}/Storage/{storage_id}/Controllers/{dev_type}"}
+                    )
 
         response = {
             "@odata.id": f"/redfish/v1/Systems/{vm_id}/Storage/{storage_id}/Controllers",
@@ -1201,11 +1229,15 @@ def get_controller_collection(proxmox: ProxmoxAPI, vm_id: int, storage_id: str) 
         return handle_proxmox_error("Controller collection retrieval", e, vm_id)
 
 
-def get_ethernet_interface_collection(proxmox: ProxmoxAPI, vm_id: int) -> Union[Dict[str, Any], Tuple[Dict[str, Any], int]]:
+def get_ethernet_interface_collection(
+    proxmox: ProxmoxAPI, vm_id: int
+) -> Union[Dict[str, Any], Tuple[Dict[str, Any], int]]:
     try:
         config = proxmox.nodes(PROXMOX_NODE).qemu(vm_id).config.get()
         if config is None:
-            return handle_proxmox_error("Ethernet interface collection retrieval", Exception("Failed to retrieve VM configuration"), vm_id)
+            return handle_proxmox_error(
+                "Ethernet interface collection retrieval", Exception("Failed to retrieve VM configuration"), vm_id
+            )
 
         # Get network interfaces from config
         interfaces = []
@@ -1226,11 +1258,15 @@ def get_ethernet_interface_collection(proxmox: ProxmoxAPI, vm_id: int) -> Union[
         return handle_proxmox_error("Ethernet interface collection retrieval", e, vm_id)
 
 
-def get_ethernet_interface_detail(proxmox: ProxmoxAPI, vm_id: int, interface_id: str) -> Union[Dict[str, Any], Tuple[Dict[str, Any], int]]:
+def get_ethernet_interface_detail(
+    proxmox: ProxmoxAPI, vm_id: int, interface_id: str
+) -> Union[Dict[str, Any], Tuple[Dict[str, Any], int]]:
     try:
         config = proxmox.nodes(PROXMOX_NODE).qemu(vm_id).config.get()
         if config is None:
-            return handle_proxmox_error("Ethernet interface detail retrieval", Exception("Failed to retrieve VM configuration"), vm_id)
+            return handle_proxmox_error(
+                "Ethernet interface detail retrieval", Exception("Failed to retrieve VM configuration"), vm_id
+            )
 
         if interface_id not in config:
             return {
@@ -1256,7 +1292,9 @@ def get_virtual_media(proxmox: ProxmoxAPI, vm_id: int) -> Union[Dict[str, Any], 
     try:
         config = proxmox.nodes(PROXMOX_NODE).qemu(vm_id).config.get()
         if config is None:
-            return handle_proxmox_error("Virtual media retrieval", Exception("Failed to retrieve VM configuration"), vm_id)
+            return handle_proxmox_error(
+                "Virtual media retrieval", Exception("Failed to retrieve VM configuration"), vm_id
+            )
 
         # Check if CD-ROM is configured
         cd_configured = "ide2" in config and "media=cdrom" in config["ide2"]
@@ -1317,7 +1355,7 @@ def get_vm_status(proxmox: ProxmoxAPI, vm_id: int) -> Union[Dict[str, Any], Tupl
         boot_order = config.get("boot", "")
         boot_field = {
             "BootSourceOverrideEnabled": "Once",  # or "Continuous"/"Disabled" as appropriate
-            "BootSourceOverrideTarget": "None",   # Could be "Pxe", "Cd", "Hdd", etc.
+            "BootSourceOverrideTarget": "None",  # Could be "Pxe", "Cd", "Hdd", etc.
             "BootSourceOverrideMode": "UEFI" if config.get("bios") == "ovmf" else "Legacy",
             "BootSourceOverrideTarget@Redfish.AllowableValues": ["Pxe", "Cd", "Hdd"],
             "BootSourceOverrideMode@Redfish.AllowableValues": ["UEFI", "Legacy"],
@@ -1329,7 +1367,13 @@ def get_vm_status(proxmox: ProxmoxAPI, vm_id: int) -> Union[Dict[str, Any], Tupl
             "#ComputerSystem.Reset": {
                 "target": f"/redfish/v1/Systems/{vm_id}/Actions/ComputerSystem.Reset",
                 "ResetType@Redfish.AllowableValues": [
-                    "On", "ForceOff", "GracefulShutdown", "GracefulRestart", "ForceRestart", "Nmi", "PowerCycle"
+                    "On",
+                    "ForceOff",
+                    "GracefulShutdown",
+                    "GracefulRestart",
+                    "ForceRestart",
+                    "Nmi",
+                    "PowerCycle",
                 ],
             }
         }
