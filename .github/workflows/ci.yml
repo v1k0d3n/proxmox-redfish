@@ -34,6 +34,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
+        pip install -r requirements-dev.txt
 
     - name: Run linting checks
       run: |
@@ -84,7 +85,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        pip install bandit safety
+        pip install -r requirements-dev.txt
 
     - name: Run security checks
       run: |
