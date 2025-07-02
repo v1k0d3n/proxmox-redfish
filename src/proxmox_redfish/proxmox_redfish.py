@@ -1374,7 +1374,7 @@ def get_vm_status(proxmox, vm_id):
         boot_target = "None"
         if boot_order:
             if boot_order.startswith("order="):
-                boot_order = boot_order[len("order="):]
+                boot_order = boot_order[len("order=") :]
             devices = boot_order.split(";") if ";" in boot_order else [boot_order]
             for device in devices:
                 if device.startswith("net"):
