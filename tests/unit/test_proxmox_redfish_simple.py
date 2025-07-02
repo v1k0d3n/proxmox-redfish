@@ -265,6 +265,22 @@ class TestRedfishProxmox(unittest.TestCase):
         self.assertIn("Attributes", response)
         self.assertEqual(response["FirmwareMode"], "BIOS")  # Based on mock config "seabios"
     
+    def test_validate_token_basic_auth_success(self):
+        """Test successful Basic authentication"""
+        credentials = f"{self.test_username}:{self.test_password}"
+        encoded_credentials = base64.b64encode(credentials.encode()).decode()
+        headers = {"Authorization": f"Basic {encoded_credentials}"}
+        
+        # Mock the authenticate_user function to return True
+        with patch('proxmox_redfish.proxmox_redfish.authenticate_user') as mock_auth:
+            mock_auth.return_value = True
+            
+            # Mock the AUTH variable directly in the validate_token function
+            with patch('proxmox_redfish.proxmox_redfish.AUTH', 'Basic'):
+                valid, message = validate_token(headers)
+                self.assertTrue(valid)
+                self.assertEqual(message, self.test_username)
+    
     def test_validate_token_session_auth_success(self):
         """Test successful Session authentication"""
         headers = {"X-Auth-Token": self.test_token}
@@ -281,9 +297,11 @@ class TestRedfishProxmox(unittest.TestCase):
         }
         
         try:
-            valid, message = validate_token(headers)
-            self.assertTrue(valid)
-            self.assertEqual(message, self.test_username)
+            # Mock the AUTH variable to use Session authentication
+            with patch('proxmox_redfish.proxmox_redfish.AUTH', 'Session'):
+                valid, message = validate_token(headers)
+                self.assertTrue(valid)
+                self.assertEqual(message, self.test_username)
         finally:
             rfp.sessions = original_sessions
     
@@ -291,9 +309,11 @@ class TestRedfishProxmox(unittest.TestCase):
         """Test invalid token validation"""
         headers = {"X-Auth-Token": "invalid-token"}
         
-        valid, message = validate_token(headers)
-        self.assertFalse(valid)
-        self.assertIn("Invalid", message)
+        # Mock the AUTH variable to use Session authentication
+        with patch('proxmox_redfish.proxmox_redfish.AUTH', 'Session'):
+            valid, message = validate_token(headers)
+            self.assertFalse(valid)
+            self.assertIn("Invalid", message)
     
     def test_reorder_boot_order_pxe(self):
         """Test boot order reordering for PXE"""

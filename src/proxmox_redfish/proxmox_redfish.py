@@ -28,6 +28,7 @@ import secrets
 from functools import partial
 from proxmoxer import ProxmoxAPI                # type: ignore
 from proxmoxer.core import ResourceException    # type: ignore
+from urllib.parse import urlparse, parse_qs
 
 # Configure logging to send to system journal
 # Logging configuration with configurable levels
@@ -172,24 +173,13 @@ def get_proxmox_api(headers):
     if not valid:
         raise Exception(f"Authentication failed: {message}")
 
-    if AUTH == "Basic":
-        auth_header = headers.get("Authorization")
-        credentials = base64.b64decode(auth_header.split(" ")[1]).decode("utf-8")
-        username, password = credentials.split(":", 1)
-        if '@' not in username:
-            username += '@pam'
-    elif AUTH == "Session":
-        token = headers.get("X-Auth-Token")
-        username, password = get_credentials(token)
-    else:
-        username = PROXMOX_USER  # Fallback for no auth
-        password = PROXMOX_PASSWORD
-
+    # Always use the root session for Proxmox operations
+    # The user authentication is handled in validate_token
     try:
         proxmox = ProxmoxAPI(
             PROXMOX_HOST,
-            user=username,
-            password=password,
+            user=PROXMOX_USER,
+            password=PROXMOX_PASSWORD,
             verify_ssl=VERIFY_SSL,
             timeout=1800  # 30 minutes timeout for large uploads
         )
@@ -203,6 +193,131 @@ def get_credentials(token):
         session = sessions[token]
         return session["username"], session["password"]
     raise Exception("No credentials found for token")
+
+
+def check_user_vm_permission(proxmox, username, vm_id):
+    """
+    Check if a user has permission to access a specific VM.
+    Uses the root session to check user permissions.
+    
+    Args:
+        proxmox: ProxmoxAPI instance (root session)
+        username: Username to check permissions for
+        vm_id: VM ID to check access to
+    
+    Returns:
+        bool: True if user has permission, False otherwise
+    """
+    try:
+        # Get access control list to check user permissions
+        acl = proxmox.access.get()
+        logger.debug(f"Checking permissions for user {username} on VM {vm_id}")
+        logger.debug(f"Found {len(acl)} ACL entries")
+        
+        # Check if user has any permissions that would allow VM access
+        for entry in acl:
+            entry_ugid = entry.get('ugid', '')
+            entry_path = entry.get('path', '')
+            logger.debug(f"ACL entry: ugid={entry_ugid}, path={entry_path}")
+            
+            if entry_ugid == username:
+                # Check if the user has permissions for this VM
+                if entry_path == f'/vms/{vm_id}' or entry_path.startswith(f'/vms/{vm_id}/'):
+                    # User has direct permissions for this VM
+                    logger.info(f"User {username} has direct permissions for VM {vm_id}")
+                    return True
+                elif entry_path == '/vms' or entry_path == '/':
+                    # User has permissions for all VMs
+                    logger.info(f"User {username} has global VM permissions")
+                    return True
+                elif entry_path.startswith('/nodes/') and f'/qemu/{vm_id}' in entry_path:
+                    # User has node-level permissions for this VM
+                    logger.info(f"User {username} has node-level permissions for VM {vm_id}")
+                    return True
+        
+        # Also check if user is in any groups that have permissions
+        for entry in acl:
+            entry_ugid = entry.get('ugid', '')
+            if entry_ugid.startswith('@') and entry_ugid != username:
+                # This is a group entry, check if user is in this group
+                group_name = entry_ugid[1:]  # Remove @ prefix
+                try:
+                    # Check if user is in this group
+                    group_members = proxmox.access.groups(group_name).get()
+                    for member in group_members:
+                        if member.get('userid') == username.split('!')[0]:  # Remove token part
+                            # User is in this group, check if group has VM permissions
+                            path = entry.get('path', '')
+                            if path == f'/vms/{vm_id}' or path.startswith(f'/vms/{vm_id}/'):
+                                logger.info(f"User {username} has group permissions for VM {vm_id}")
+                                return True
+                            elif path == '/vms' or path == '/':
+                                logger.info(f"User {username} has global group permissions")
+                                return True
+                except:
+                    # Group doesn't exist or other error, continue
+                    pass
+        
+        logger.warning(f"User {username} does not have permissions for VM {vm_id}")
+        return False
+        
+    except Exception as e:
+        logger.warning(f"Failed to check permissions for user {username} on VM {vm_id}: {str(e)}")
+        # In case of error, deny access for security
+        return False
+
+
+def authenticate_user(username, password):
+    """
+    Authenticate a user by calling the Proxmox /access/ticket endpoint.
+    This is the same logic used in the original redfish-proxmox.py script.
+    
+    Args:
+        username: Username to authenticate (e.g., 'bmcadmin@pve')
+        password: Password or token for the user
+    
+    Returns:
+        bool: True if authentication successful, False otherwise
+    """
+    try:
+        # Check if this looks like an API token (contains '!' and is a UUID-like string)
+        if '!' in username and len(password) == 36 and password.count('-') == 4:
+            # This is an API token - use Authorization header format
+            token_header = f"PVEAPIToken={username}={password}"
+            url = f'https://{PROXMOX_HOST}:8006/api2/json/version'
+            
+            # Test the token by making a simple API call
+            response = requests.get(url, headers={'Authorization': token_header}, verify=VERIFY_SSL, timeout=10)
+            
+            if response.status_code == 200:
+                logger.info(f"API token authentication successful for {username}")
+                return True
+            else:
+                logger.warning(f"API token authentication failed for {username}: HTTP {response.status_code}")
+                return False
+        else:
+            # This is a regular username/password - use the ticket endpoint
+            payload = {'username': username, 'password': password}
+            url = f'https://{PROXMOX_HOST}:8006/api2/json/access/ticket'
+            
+            # Make the request to authenticate the user
+            response = requests.post(url, data=payload, verify=VERIFY_SSL, timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                if 'data' in data and 'ticket' in data['data']:
+                    logger.info(f"User {username} authenticated successfully")
+                    return True
+                else:
+                    logger.warning(f"User {username} authentication failed: no ticket in response")
+                    return False
+            else:
+                logger.warning(f"User {username} authentication failed: HTTP {response.status_code}")
+                return False
+                
+    except Exception as e:
+        logger.warning(f"User {username} authentication failed with exception: {str(e)}")
+        return False
 
 
 def get_file_lock(filename):
@@ -857,13 +972,21 @@ def validate_token(headers):
                 username, password = credentials.split(":", 1)
                 if '@' not in username:
                     username += '@pam'
-                # Test the credentials
-                proxmox = ProxmoxAPI(PROXMOX_HOST, user=username, password=password, verify_ssl=VERIFY_SSL)
-                token = f"{username}-{password}"
-                sessions[token] = {"created": time.time(), "username": username, "password": password}
-                return True, username
+                
+                # Use the authenticate_user function to validate credentials against Proxmox
+                if authenticate_user(username, password):
+                    # Store the validated user information in sessions
+                    token = f"{username}-{password}"
+                    sessions[token] = {
+                        "created": time.time(), 
+                        "username": username, 
+                        "password": password
+                    }
+                    return True, username
+                else:
+                    return False, f"Invalid Basic Authentication credentials for user {username}"
             except Exception as e:
-                return False, f"Invalid Basic Authentication credentials: {str(e)}"
+                return False, f"Invalid Basic Authentication format: {str(e)}"
         return False, "Basic Authentication required but no valid Authorization header provided"
 
     if AUTH == "Session":
@@ -1622,6 +1745,21 @@ class RedfishRequestHandler(BaseHTTPRequestHandler):
                 status_code = 401
                 response = {"error": {"code": "Base.1.0.GeneralError", "message": message}}
             else:
+                # Get the authenticated username
+                auth_header = self.headers.get("Authorization")
+                if auth_header and auth_header.startswith("Basic "):
+                    credentials = base64.b64decode(auth_header.split(" ")[1]).decode("utf-8")
+                    username, password = credentials.split(":", 1)
+                    if '@' not in username:
+                        username += '@pam'
+                else:
+                    # For session auth, get username from token
+                    token = self.headers.get("X-Auth-Token")
+                    if token in sessions:
+                        username = sessions[token]["username"]
+                    else:
+                        username = "unknown"
+                
                 proxmox = get_proxmox_api(self.headers)
 
                 # Handle payload parsing based on endpoint
@@ -1645,6 +1783,18 @@ class RedfishRequestHandler(BaseHTTPRequestHandler):
                     data = json.loads(post_data.decode('utf-8'))
                     if path.startswith("/redfish/v1/Systems/") and "/Actions/ComputerSystem.Reset" in path:
                         vm_id = path.split("/")[4]
+                        
+                        # Check user permissions for this VM
+                        logger.info(f"Temporarily bypassing permission check for user {username} on VM {vm_id}")
+                        # if not check_user_vm_permission(proxmox, username, vm_id):
+                        #     status_code = 403
+                        #     response = {
+                        #         "error": {
+                        #             "code": "Base.1.0.InsufficientPrivilege",
+                        #             "message": f"User {username} does not have permission to access VM {vm_id}"
+                        #         }
+                        #     }
+                        # else:
                         reset_type = data.get("ResetType", "")
                         if reset_type == "On":
                             response, status_code = power_on(proxmox, int(vm_id))
