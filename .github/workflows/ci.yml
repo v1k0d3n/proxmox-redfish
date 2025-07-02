@@ -39,7 +39,7 @@ jobs:
     - name: Run linting checks
       run: |
         echo "Running flake8..."
-        flake8 src/ tests/
+        flake8 src/ tests/ --max-line-length=120 --ignore=E203,E501,W503
         echo "Running black check..."
         black --check src/ tests/
         echo "Running isort check..."
