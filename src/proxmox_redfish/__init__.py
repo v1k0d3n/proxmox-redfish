@@ -1,1 +1,1 @@
-from .proxmox_redfish import *
+# proxmox_redfish package

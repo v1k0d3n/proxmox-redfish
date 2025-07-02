@@ -12,10 +12,6 @@ import time
 import unittest
 from unittest.mock import Mock, patch
 
-# Add the current directory to the path so we can import the main module
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
-# Import the functions we want to test
 from proxmox_redfish.proxmox_redfish import (
     _ensure_iso_available,
     get_bios,
@@ -29,6 +25,8 @@ from proxmox_redfish.proxmox_redfish import (
     reset_vm,
     validate_token,
 )
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 
 class TestRedfishProxmox(unittest.TestCase):

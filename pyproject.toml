@@ -120,4 +120,8 @@ exclude_lines = [
     "if __name__ == .__main__.:",
     "class .*\\bProtocol\\):",
     "@(abc\\.)?abstractmethod",
-] 
+]
+
+[tool.flake8]
+max-line-length = 120
+ignore = ["E203", "E501", "W503"] 

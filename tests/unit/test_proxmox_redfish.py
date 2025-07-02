@@ -21,21 +21,13 @@ import os
 import sys
 import time
 import unittest
-from http.server import BaseHTTPRequestHandler
 from io import BytesIO
 from unittest.mock import Mock, patch
 
-import requests
-
-# Add the current directory to the path so we can import the main module
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
-# Import the functions we want to test
 from proxmox_redfish.proxmox_redfish import (
     RedfishRequestHandler,
     _ensure_iso_available,
     get_bios,
-    get_proxmox_api,
     get_vm_status,
     handle_proxmox_error,
     manage_virtual_media,
@@ -46,6 +38,8 @@ from proxmox_redfish.proxmox_redfish import (
     reset_vm,
     validate_token,
 )
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 
 class MockProxmoxAPI:
@@ -649,7 +643,7 @@ class TestRedfishEndpoints(unittest.TestCase):
             mock_proxmox = Mock()
             mock_get_api.return_value = mock_proxmox
 
-            mock_power_response = {"@odata.id": f"/redfish/v1/TaskService/Tasks/test-task", "TaskState": "Running"}
+            mock_power_response = {"@odata.id": "/redfish/v1/TaskService/Tasks/test-task", "TaskState": "Running"}
             mock_power_on.return_value = (mock_power_response, 202)
 
             handler.do_POST()
@@ -675,7 +669,7 @@ class TestRedfishEndpoints(unittest.TestCase):
             mock_proxmox = Mock()
             mock_get_api.return_value = mock_proxmox
 
-            mock_manage_response = {"@odata.id": f"/redfish/v1/TaskService/Tasks/test-task", "TaskState": "Running"}
+            mock_manage_response = {"@odata.id": "/redfish/v1/TaskService/Tasks/test-task", "TaskState": "Running"}
             mock_manage.return_value = (mock_manage_response, 202)
 
             handler.do_POST()
@@ -699,7 +693,7 @@ class TestRedfishEndpoints(unittest.TestCase):
             mock_proxmox = Mock()
             mock_get_api.return_value = mock_proxmox
 
-            mock_manage_response = {"@odata.id": f"/redfish/v1/TaskService/Tasks/test-task", "TaskState": "Running"}
+            mock_manage_response = {"@odata.id": "/redfish/v1/TaskService/Tasks/test-task", "TaskState": "Running"}
             mock_manage.return_value = (mock_manage_response, 202)
 
             handler.do_POST()
