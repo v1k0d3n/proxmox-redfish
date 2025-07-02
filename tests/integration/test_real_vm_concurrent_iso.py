@@ -15,7 +15,10 @@ import requests
 # Configuration - adjust these for your environment
 REDFISH_BASE_URL = "http://localhost:8000"  # Your available VMs for testing
 VM_IDS = [501, 502, 503]  # Your available VMs for testing
-TEST_ISO_URL = "https://download.fedoraproject.org/pub/fedora/linux/releases/42/Workstation/x86_64/iso/Fedora-Workstation-Live-42-1.1.x86_64.iso"  # ISO you want to use for testing
+TEST_ISO_URL = (
+    "https://download.fedoraproject.org/pub/fedora/linux/releases/42/Workstation/x86_64/iso/"
+    "Fedora-Workstation-Live-42-1.1.x86_64.iso"
+)  # ISO you want to use for testing
 
 # Authentication - use environment variables or adjust as needed
 AUTH_TOKEN = os.getenv("REDFISH_AUTH_TOKEN", "your-auth-token-here")
