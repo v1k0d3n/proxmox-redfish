@@ -1297,11 +1297,7 @@ def get_virtual_media(proxmox: ProxmoxAPI, vm_id: int) -> Union[Dict[str, Any], 
             )
 
         # Inserted is True only if ide2 is present, is a cdrom, and not 'none,media=cdrom'
-        cd_configured = (
-            "ide2" in config
-            and "media=cdrom" in config["ide2"]
-            and not config["ide2"].startswith("none")
-        )
+        cd_configured = "ide2" in config and "media=cdrom" in config["ide2"] and not config["ide2"].startswith("none")
 
         response = {
             "@odata.id": f"/redfish/v1/Managers/{vm_id}/VirtualMedia/Cd",
