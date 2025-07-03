@@ -73,6 +73,7 @@ PROXMOX_HOST = os.getenv("PROXMOX_HOST", "pve-node-hostname")
 PROXMOX_USER = os.getenv("PROXMOX_USER", "username")
 PROXMOX_PASSWORD = os.getenv("PROXMOX_PASSWORD", "password")
 PROXMOX_NODE = os.getenv("PROXMOX_NODE", "pve=-node-name")
+PROXMOX_API_PORT = os.getenv("PROXMOX_API_PORT", "8006")
 VERIFY_SSL = os.getenv("VERIFY_SSL", "false").lower() == "true"
 # ISO storage configuration - specifies the storage pool for ISO downloads
 PROXMOX_ISO_STORAGE = os.getenv("PROXMOX_ISO_STORAGE", "local")
@@ -291,7 +292,7 @@ def authenticate_user(username: str, password: str) -> bool:
         if "!" in username and len(password) == 36 and password.count("-") == 4:
             # This is an API token - use Authorization header format
             token_header = f"PVEAPIToken={username}={password}"
-            url = f"https://{PROXMOX_HOST}:8006/api2/json/version"
+            url = f"https://{PROXMOX_HOST}:{PROXMOX_API_PORT}/api2/json/version"
 
             # Test the token by making a simple API call
             response = requests.get(url, headers={"Authorization": token_header}, verify=VERIFY_SSL, timeout=10)
@@ -305,7 +306,7 @@ def authenticate_user(username: str, password: str) -> bool:
         else:
             # This is a regular username/password - use the ticket endpoint
             payload = {"username": username, "password": password}
-            url = f"https://{PROXMOX_HOST}:8006/api2/json/access/ticket"
+            url = f"https://{PROXMOX_HOST}:{PROXMOX_API_PORT}/api2/json/access/ticket"
 
             # Make the request to authenticate the user
             response = requests.post(url, data=payload, verify=VERIFY_SSL, timeout=10)

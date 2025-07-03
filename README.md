@@ -106,6 +106,7 @@ This guide will take you from a fresh Proxmox installation to a fully working Re
    export PROXMOX_HOST="$(hostname -I | awk '{print $1}')"
    export PROXMOX_USER="root@pam"
    export PROXMOX_PASSWORD="your-proxmox-root-password"
+   export PROXMOX_API_PORT="8006"
    export PROXMOX_NODE="$(hostname)"
    export PROXMOX_ISO_STORAGE="local"
 
