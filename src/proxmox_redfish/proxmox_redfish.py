@@ -1314,8 +1314,8 @@ def get_virtual_media(proxmox: ProxmoxAPI, vm_id: int) -> Union[Dict[str, Any], 
                 },
                 "#VirtualMedia.EjectMedia": {
                     "target": f"/redfish/v1/Managers/{vm_id}/VirtualMedia/Cd/Actions/VirtualMedia.EjectMedia"
-                }
-            }
+                },
+            },
         }
         return response
     except Exception as e:
@@ -1329,13 +1329,11 @@ def get_manager(proxmox: ProxmoxAPI, manager_id: int) -> Union[Dict[str, Any], T
     try:
         # Map manager_id to vm_id (they are the same in our implementation)
         vm_id = manager_id
-        
+
         # Get VM config to verify it exists
         config = proxmox.nodes(PROXMOX_NODE).qemu(vm_id).config.get()
         if config is None:
-            return handle_proxmox_error(
-                "Manager retrieval", Exception("Failed to retrieve VM configuration"), vm_id
-            )
+            return handle_proxmox_error("Manager retrieval", Exception("Failed to retrieve VM configuration"), vm_id)
 
         response = {
             "@odata.id": f"/redfish/v1/Managers/{manager_id}",
@@ -1343,13 +1341,8 @@ def get_manager(proxmox: ProxmoxAPI, manager_id: int) -> Union[Dict[str, Any], T
             "Id": str(manager_id),
             "Name": f"Manager for VM {vm_id}",
             "ManagerType": "BMC",
-            "Status": {
-                "State": "Enabled",
-                "Health": "OK"
-            },
-            "VirtualMedia": {
-                "@odata.id": f"/redfish/v1/Managers/{manager_id}/VirtualMedia"
-            }
+            "Status": {"State": "Enabled", "Health": "OK"},
+            "VirtualMedia": {"@odata.id": f"/redfish/v1/Managers/{manager_id}/VirtualMedia"},
         }
         return response
     except Exception as e:
@@ -1435,13 +1428,7 @@ def get_vm_status(proxmox: ProxmoxAPI, vm_id: int) -> Union[Dict[str, Any], Tupl
             "EthernetInterfaces": {"@odata.id": f"/redfish/v1/Systems/{vm_id}/EthernetInterfaces"},
             "Boot": boot_field,
             "Actions": actions_field,
-            "Links": {
-                "ManagedBy": [
-                    {
-                        "@odata.id": f"/redfish/v1/Managers/{vm_id}"
-                    }
-                ]
-            }
+            "Links": {"ManagedBy": [{"@odata.id": f"/redfish/v1/Managers/{vm_id}"}]},
         }
         return response
     except Exception as e:
@@ -1493,7 +1480,10 @@ class RedfishRequestHandler(BaseHTTPRequestHandler):
                     except Exception as e:
                         status_code = 500
                         response = {
-                            "error": {"code": "Base.1.0.GeneralError", "message": f"Failed to retrieve VM list: {str(e)}"}
+                            "error": {
+                                "code": "Base.1.0.GeneralError",
+                                "message": f"Failed to retrieve VM list: {str(e)}",
+                            }
                         }
                 elif path.startswith("/redfish/v1/Systems/"):
                     if len(parts) == 5 and parts[4].isdigit():  # /redfish/v1/Systems/<vm_id>
@@ -1582,14 +1572,15 @@ class RedfishRequestHandler(BaseHTTPRequestHandler):
                 # --- New: Managers endpoints (Metal3/Ironic path) -----------------
                 elif path.startswith("/redfish/v1/Managers/") and len(parts) == 5 and parts[4].isdigit():
                     # /redfish/v1/Managers/<manager_id> - Manager detail
-                    manager_id = int(parts[4])
-                    response = get_manager(proxmox, manager_id)
+                    manager_id = parts[4]  # string
+                    vm_id = int(manager_id)
+                    response = get_manager(proxmox, vm_id)
                     if isinstance(response, tuple):
                         response, status_code = response
                 elif path.startswith("/redfish/v1/Managers/") and len(parts) == 6 and parts[5] == "VirtualMedia":
                     # /redfish/v1/Managers/1/VirtualMedia - VirtualMedia collection
-                    manager_id = parts[4]  # usually "1"
-                    vm_id = int(manager_id)  # map Manager-ID → VM-ID
+                    manager_id = parts[4]  # string
+                    vm_id = int(manager_id)
                     response = {
                         "@odata.id": f"/redfish/v1/Managers/{manager_id}/VirtualMedia",
                         "@odata.type": "#VirtualMediaCollection.VirtualMediaCollection",
@@ -1603,10 +1594,9 @@ class RedfishRequestHandler(BaseHTTPRequestHandler):
                     and parts[5] == "VirtualMedia"
                     and parts[6] == "Cd"
                 ):
-                    # /redfish/v1/Managers/1/VirtualMedia/Cd - VirtualMedia detail
-                    manager_id = parts[4]  # usually "1"
-                    vm_id = int(manager_id)  # map Manager-ID → VM-ID
-                    response = get_virtual_media(proxmox, int(vm_id))
+                    manager_id = parts[4]  # string
+                    vm_id = int(manager_id)
+                    response = get_virtual_media(proxmox, vm_id)
                     if isinstance(response, tuple):
                         response, status_code = response
                 else:
@@ -1715,7 +1705,7 @@ class RedfishRequestHandler(BaseHTTPRequestHandler):
 
                     data = json.loads(post_data.decode("utf-8"))
                     if path.startswith("/redfish/v1/Systems/") and "/Actions/ComputerSystem.Reset" in path:
-                        vm_id = path.split("/")[4]
+                        vm_id = int(path.split("/")[4])
 
                         # Check user permissions for this VM
                         logger.info(f"Temporarily bypassing permission check for user {username} on VM {vm_id}")
@@ -1730,19 +1720,19 @@ class RedfishRequestHandler(BaseHTTPRequestHandler):
                         # else:
                         reset_type = data.get("ResetType", "")
                         if reset_type == "On":
-                            response, status_code = power_on(proxmox, int(vm_id))
+                            response, status_code = power_on(proxmox, vm_id)
                         elif reset_type == "GracefulShutdown":
-                            response, status_code = power_off(proxmox, int(vm_id))
+                            response, status_code = power_off(proxmox, vm_id)
                         elif reset_type == "ForceOff":
-                            response, status_code = stop_vm(proxmox, int(vm_id))
+                            response, status_code = stop_vm(proxmox, vm_id)
                         elif reset_type == "GracefulRestart":
-                            response, status_code = reboot(proxmox, int(vm_id))
+                            response, status_code = reboot(proxmox, vm_id)
                         elif reset_type == "ForceRestart":
-                            response, status_code = reset_vm(proxmox, int(vm_id))
+                            response, status_code = reset_vm(proxmox, vm_id)
                         elif reset_type == "Pause":
-                            response, status_code = suspend_vm(proxmox, int(vm_id))
+                            response, status_code = suspend_vm(proxmox, vm_id)
                         elif reset_type == "Resume":
-                            response, status_code = resume_vm(proxmox, int(vm_id))
+                            response, status_code = resume_vm(proxmox, vm_id)
                         else:
                             status_code = 400
                             response = {
@@ -1764,15 +1754,15 @@ class RedfishRequestHandler(BaseHTTPRequestHandler):
                         path.startswith("/redfish/v1/Systems/")
                         and "/VirtualMedia/CDROM/Actions/VirtualMedia.InsertMedia" in path
                     ):
-                        vm_id = path.split("/")[4]
+                        vm_id = int(path.split("/")[4])
                         iso_path = data.get("Image")
-                        response, status_code = manage_virtual_media(proxmox, int(vm_id), "InsertMedia", iso_path)
+                        response, status_code = manage_virtual_media(proxmox, vm_id, "InsertMedia", iso_path)
                     elif (
                         path.startswith("/redfish/v1/Systems/")
                         and "/VirtualMedia/CDROM/Actions/VirtualMedia.EjectMedia" in path
                     ):
-                        vm_id = path.split("/")[4]
-                        response, status_code = manage_virtual_media(proxmox, int(vm_id), "EjectMedia")
+                        vm_id = int(path.split("/")[4])
+                        response, status_code = manage_virtual_media(proxmox, vm_id, "EjectMedia")
                     # --- New: Managers/…/VirtualMedia (sushy default path) -----------------
                     elif (
                         path.startswith("/redfish/v1/Managers/")
@@ -1781,20 +1771,20 @@ class RedfishRequestHandler(BaseHTTPRequestHandler):
                         manager_id = path.split("/")[4]  # usually "1"
                         iso_path = data.get("Image")
                         # map Manager-ID → VM-ID  (here we treat them as identical)
-                        vm_id = manager_id
-                        response, status_code = manage_virtual_media(proxmox, int(vm_id), "InsertMedia", iso_path)
+                        vm_id = int(manager_id)
+                        response, status_code = manage_virtual_media(proxmox, vm_id, "InsertMedia", iso_path)
 
                     elif (
                         path.startswith("/redfish/v1/Managers/")
                         and "/VirtualMedia/Cd/Actions/VirtualMedia.EjectMedia" in path
                     ):
                         manager_id = path.split("/")[4]
-                        vm_id = manager_id
-                        response, status_code = manage_virtual_media(proxmox, int(vm_id), "EjectMedia")
+                        vm_id = int(manager_id)
+                        response, status_code = manage_virtual_media(proxmox, vm_id, "EjectMedia")
                     elif path.startswith("/redfish/v1/Systems/") and "/Actions/ComputerSystem.UpdateConfig" in path:
-                        vm_id = path.split("/")[4]
+                        vm_id = int(path.split("/")[4])
                         config_data = data
-                        response, status_code = update_vm_config(proxmox, int(vm_id), config_data)
+                        response, status_code = update_vm_config(proxmox, vm_id, config_data)
                     else:
                         status_code = 404
                         response = {
