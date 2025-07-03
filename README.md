@@ -1,5 +1,11 @@
 # Proxmox Redfish Daemon
 
+[![CI/CD Pipeline](https://github.com/v1k0d3n/proxmox-redfish/workflows/CI%2FCD%20Pipeline/badge.svg)](https://github.com/v1k0d3n/proxmox-redfish/actions)
+[![Coverage](https://codecov.io/gh/v1k0d3n/proxmox-redfish/branch/main/graph/badge.svg)](https://codecov.io/gh/v1k0d3n/proxmox-redfish)
+[![Python](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/v1k0d3n/proxmox-redfish)](https://github.com/v1k0d3n/proxmox-redfish/releases)
+
 A Redfish API daemon for managing Proxmox VMs, providing a standardized interface for VM operations through the Redfish protocol. This enables integration with tools like Metal3, Ironic, OpenShift ACM ZTP/GitOps, and other Redfish-compatible management solutions.
 
 ## Table of Contents
