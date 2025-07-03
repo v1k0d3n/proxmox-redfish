@@ -71,7 +71,7 @@ This guide will take you from a fresh Proxmox installation to a fully working Re
    git clone https://github.com/v1k0d3n/proxmox-redfish.git /opt/proxmox-redfish
 
    # Create a virtual environment
-   /opt/proxmox-redfish
+   cd /opt/proxmox-redfish
    python3 -m venv venv
 
    # Activate the virtual environment
@@ -83,6 +83,7 @@ This guide will take you from a fresh Proxmox installation to a fully working Re
 
 6. Optional (recommended): Generate basic SSL certificates - these can be valid certs, if you want to generate them a different way (below is primarily a working example)
 
+   **WARNING:** *For all you copy/paste warriors out there, be sure to check out the [Administrators Guide](./docs/admins/README.md#ssl-configuration) for better certificate options (including [Let's Encrypt](./docs/admins/README.md#lets-encrypt-certificate-production) options).*
    ```bash
    # Ensure this directory exists - it should already exists
    mkdir -p /opt/proxmox-redfish/config/ssl
