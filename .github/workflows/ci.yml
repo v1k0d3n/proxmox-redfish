@@ -12,14 +12,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.8", "3.9", "3.10", "3.11"]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
 
@@ -34,12 +34,8 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        echo "Installing core dependencies..."
-        pip install -r requirements.txt
-        echo "Installing development dependencies..."
-        pip install -r requirements-dev.txt
-        echo "Installing package in development mode..."
-        pip install -e .
+        echo "Installing package with dev extras..."
+        pip install -e ".[dev]"
         echo "Installed packages:"
         pip list
 
@@ -51,6 +47,11 @@ jobs:
         black --check src/ tests/ --line-length=120
         echo "Running isort check..."
         isort --check-only src/ tests/ --line-length=120
+
+    - name: Verify the package still matches the pre-refactor monolith
+      run: |
+        echo "Running extraction check..."
+        python tools/check_extraction.py --monolith-rev bc074ad --quiet
 
     - name: Run type checking
       run: |
@@ -82,7 +83,7 @@ jobs:
         pytest tests/integration/ -v --tb=short
 
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v5
       with:
         file: ./coverage.xml
         flags: unittests
@@ -98,22 +99,21 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: "3.11"
 
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install -r requirements-dev.txt
+        pip install -e ".[dev]"
 
     - name: Run security checks
       run: |
         echo "Running bandit security scan..."
         bandit -r src/ -f json -o bandit-report.json || true
-        echo "Running safety check..."
-        safety check --json --output safety-report.json || true
+        echo "Running pip-audit..."
+        pip-audit --format json --output pip-audit-report.json || true
 
     - name: Upload security reports
       uses: actions/upload-artifact@v4
@@ -121,7 +121,7 @@ jobs:
         name: security-reports
         path: |
           bandit-report.json
-          safety-report.json
+          pip-audit-report.json
 
   build:
     runs-on: ubuntu-latest
@@ -132,7 +132,7 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: "3.11"
 
@@ -164,7 +164,7 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v2
+      uses: docker/setup-buildx-action@v3
 
     - name: Build Docker image
       run: |

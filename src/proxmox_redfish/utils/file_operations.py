@@ -5,15 +5,15 @@ import hashlib
 import os
 import shutil
 import threading
-from typing import Optional
+from typing import Dict, Optional
 
 from ..config.logging_config import logger
 
 # Global lock for ISO operations to prevent race conditions
 iso_operation_lock = threading.Lock()
 
-# File locks for individual ISO files
-iso_file_locks = {}
+# File locks for individual ISO files, keyed by ISO filename.
+iso_file_locks: Dict[str, threading.Lock] = {}
 iso_file_locks_lock = threading.Lock()
 
 
