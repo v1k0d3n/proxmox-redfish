@@ -577,7 +577,7 @@ def _ensure_iso_available(proxmox: ProxmoxAPI, url_or_volid: str) -> str:
 
                 # Download to temp file to calculate hash
                 logger.info("Downloading ISO to calculate hash for comparison")
-                resp = requests.get(url_or_volid, stream=True, timeout=600, verify=VERIFY_SSL)
+                resp = requests.get(url_or_volid, stream=True, timeout=(30, 1800), verify=VERIFY_SSL)
                 resp.raise_for_status()
 
                 with tempfile.NamedTemporaryFile() as tmp:
@@ -620,7 +620,7 @@ def _ensure_iso_available(proxmox: ProxmoxAPI, url_or_volid: str) -> str:
             else:
                 logger.info("ISO file does not exist, downloading: %s", fname)
                 # Download the ISO
-                resp = requests.get(url_or_volid, stream=True, timeout=600, verify=VERIFY_SSL)
+                resp = requests.get(url_or_volid, stream=True, timeout=(30, 1800), verify=VERIFY_SSL)
                 resp.raise_for_status()
 
                 with tempfile.NamedTemporaryFile() as tmp:
