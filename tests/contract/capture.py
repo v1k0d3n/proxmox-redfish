@@ -16,6 +16,7 @@ are never written into the snapshot.
 import argparse
 import json
 import os
+import pathlib
 import sys
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -145,6 +146,11 @@ def main() -> int:
             1,
             args.timeout,
         )
+
+    # snapshots/ is gitignored, so it may not exist on a fresh checkout.
+    parent = pathlib.Path(args.out).parent
+    if parent and not parent.exists():
+        parent.mkdir(parents=True, exist_ok=True)
 
     with open(args.out, "w", encoding="utf-8") as handle:
         json.dump(snapshot, handle, indent=2, sort_keys=True)

@@ -80,3 +80,7 @@ backup/
 config/ssl/*.crt
 config/ssl/*.key
 config/ssl/*.pem 
+# Contract-test snapshots. These are captures from a REAL host and contain
+# MAC addresses, hostnames, storage names and task ids. Never commit them.
+tests/contract/snapshots/
+*.snapshot.json
