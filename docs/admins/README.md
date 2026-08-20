@@ -108,6 +108,93 @@ cat > /opt/proxmox-redfish/config/config.json << 'EOF'
 EOF
 ```
 
+## Proxmox Permissions
+
+The daemon connects to Proxmox as the account that made the Redfish
+request. Proxmox evaluates its own ACLs on every call, so a Redfish user
+can reach exactly the VMs they have been granted and nothing else.
+
+There is no service account standing in for callers, and no permission
+logic in this daemon. A caller with no Proxmox privileges can
+authenticate and will then be refused everything, returning
+`Base.1.0.InsufficientPrivilege` with the underlying Proxmox reason.
+
+### Required privileges
+
+| Privilege | Needed for |
+|---|---|
+| `VM.Audit` | Reading `Systems`, `Bios`, `Processors`, `Storage`, `EthernetInterfaces` |
+| `VM.PowerMgmt` | `ComputerSystem.Reset` (On, ForceOff, GracefulShutdown, restarts) |
+| `VM.Config.CDROM` | `VirtualMedia.InsertMedia` and `VirtualMedia.EjectMedia` |
+| `VM.Config.Disk` | `BootSourceOverrideTarget` |
+| `Datastore.AllocateTemplate` | Uploading an ISO supplied to `InsertMedia` as a URL |
+| `Datastore.Audit` | Listing the ISO storage |
+
+The first four apply to the VM path, the last two to the ISO storage path.
+
+**The built-in `PVEVMUser` role is not enough.** It covers `VM.Audit`,
+`VM.PowerMgmt` and `VM.Config.CDROM`, so reads, power operations and
+virtual media all succeed and only boot override fails — which makes it
+an easy mistake to ship. Boot order is a disk option in Proxmox
+(`$diskoptions` in `PVE::API2::Qemu`), guarded by `VM.Config.Disk`, not
+`VM.Config.Options`.
+
+### Setting up a Redfish account
+
+Create a role with exactly the privileges above:
+
+```bash
+pveum role add RedfishOperator --privs \
+  "VM.Audit,VM.PowerMgmt,VM.Config.CDROM,VM.Config.Disk,Datastore.AllocateTemplate,Datastore.Audit"
+```
+
+Create the user:
+
+```bash
+pveum user add bmcadmin@pve --password <password>
+```
+
+Grant it on the VMs it should manage, and on the ISO storage. Use
+`/vms/<vmid>` for a single VM or `/vms` for all of them:
+
+```bash
+pveum acl modify /vms/101 --users bmcadmin@pve --roles RedfishOperator
+pveum acl modify /storage/local --users bmcadmin@pve --roles RedfishOperator
+```
+
+In the web UI the same thing is *Datacenter → Permissions → Add → User
+Permission*, once with a `/vms/...` path and once with a `/storage/...`
+path. Roles are not path-specific, so one role serves both.
+
+### API tokens
+
+An API token works anywhere a password does, passed as Basic auth with
+the token id in the username:
+
+```bash
+curl -k -u 'bmcadmin@pve!redfish:<token-value>' \
+  https://proxmox.example.com:8000/redfish/v1/Systems
+```
+
+Tokens are the better choice for automation: they are sent with each
+request and skip the ticket exchange a password requires. Grant the
+token the same privileges as above — by default a token is restricted to
+a subset of its user's rights, so check "Privilege Separation" or grant
+the token its own ACL entries.
+
+### Upgrading from a release before caller identity
+
+Earlier versions performed all Proxmox operations as `PROXMOX_USER`,
+which meant any account that could authenticate could drive any VM.
+Callers now need real privileges.
+
+Before upgrading, grant every account that uses the Redfish API the
+privileges above on the VMs it manages. Without them the daemon still
+authenticates the caller and then returns 403 on every operation.
+
+`PROXMOX_USER` and `PROXMOX_PASSWORD` are no longer used to service
+requests.
+
 ## SSL Configuration
 
 ### Self-Signed Certificate (Development/Testing)

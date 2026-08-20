@@ -7,6 +7,7 @@ import time
 
 import requests
 from proxmoxer import ProxmoxAPI
+from proxmoxer.core import ResourceException
 
 from ..config.logging_config import logger
 from ..config.settings import (
@@ -161,6 +162,19 @@ def _ensure_iso_available(proxmox: ProxmoxAPI, url_or_volid: str) -> str:
                             time.sleep(2)
 
                     except Exception as api_error:
+                        # The direct copy below writes to the storage directory as
+                        # the daemon's own OS user, which bypasses Proxmox entirely.
+                        # That is an acceptable fallback for a transient API fault,
+                        # but not for a refusal: falling back on 401/403 would carry
+                        # out precisely the operation Proxmox just denied.
+                        if isinstance(api_error, ResourceException) and api_error.status_code in (401, 403):
+                            logger.warning(
+                                "API upload refused for %s (HTTP %s); not falling back to direct copy",
+                                fname,
+                                api_error.status_code,
+                            )
+                            raise
+
                         logger.warning("API upload failed: %s, trying direct file copy", str(api_error))
 
                         # Fallback: Direct file copy to storage directory with atomic write

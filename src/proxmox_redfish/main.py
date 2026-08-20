@@ -80,11 +80,16 @@ def main() -> None:
     config.setdefault("redfish", {}).setdefault("host", "0.0.0.0")
     config.setdefault("logging", {}).setdefault("level", "INFO")
 
-    # Validate required configuration
+    # Validate required configuration.
+    #
+    # Only the host is required. Requests are served using the calling
+    # user's own credentials, so the daemon holds no Proxmox account of
+    # its own; demanding PROXMOX_USER and PROXMOX_PASSWORD would mean
+    # keeping a privileged credential on disk that nothing ever uses.
     proxmox_config = config.get("proxmox", {})
-    if not all(key in proxmox_config for key in ["host", "user", "password"]):
-        logger.error("Missing required Proxmox configuration: host, user, password")
-        logger.error("Set via environment variables or config file")
+    if "host" not in proxmox_config:
+        logger.error("Missing required Proxmox configuration: host")
+        logger.error("Set PROXMOX_HOST via the environment or a config file")
         sys.exit(1)
 
     # Start the daemon
