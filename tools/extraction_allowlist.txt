@@ -1,0 +1,7 @@
+# Differences between the monolith and the extracted package that are
+# deliberate. Anything not listed here fails tools/check_extraction.py.
+#
+# Format:  function_name: why the difference is correct
+
+atomic_file_write: `import shutil` hoisted from inside the function to module scope; same call, no behavioural change.
+main: calls setup_logging() and uses the shared "proxmox-redfish" logger instead of shadowing it with logging.getLogger(__name__). In the monolith that shadow meant main() logged under "__main__" while every other function logged under "proxmox-redfish".
