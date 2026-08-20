@@ -69,11 +69,12 @@ from .api.redfish_endpoints import (
 from .api.virtual_media import manage_virtual_media
 from .auth.authentication import (
     authenticate_user,
+    extract_credentials,
     get_credentials,
+    qualify_username,
     sessions,
     validate_token,
 )
-from .auth.authorization import check_user_vm_permission
 from .config.logging_config import logger, setup_logging
 from .config.settings import (
     AUTH,
@@ -91,7 +92,7 @@ from .config.settings import (
     VERIFY_SSL,
 )
 from .main import main
-from .proxmox.client import get_proxmox_api
+from .proxmox.client import build_proxmox_api, get_proxmox_api
 from .proxmox.iso_manager import _ensure_iso_available
 from .proxmox.vm_operations import update_vm_config
 from .server.http_server import run_server
@@ -127,7 +128,8 @@ __all__ = [
     "_ensure_iso_available",
     "atomic_file_write",
     "authenticate_user",
-    "check_user_vm_permission",
+    "build_proxmox_api",
+    "extract_credentials",
     "get_bios",
     "get_controller_collection",
     "get_credentials",
@@ -154,6 +156,7 @@ __all__ = [
     "main",
     "manage_virtual_media",
     "parse_disk_size",
+    "qualify_username",
     "power_off",
     "power_on",
     "reboot",

@@ -320,17 +320,9 @@ class RedfishRequestHandler(BaseHTTPRequestHandler):
                     if path.startswith("/redfish/v1/Systems/") and "/Actions/ComputerSystem.Reset" in path:
                         vm_id = int(path.split("/")[4])
 
-                        # Check user permissions for this VM
-                        logger.info(f"Temporarily bypassing permission check for user {username} on VM {vm_id}")
-                        # if not check_user_vm_permission(proxmox, username, vm_id):
-                        #     status_code = 403
-                        #     response = {
-                        #         "error": {
-                        #             "code": "Base.1.0.InsufficientPrivilege",
-                        #             "message": f"User {username} does not have permission to access VM {vm_id}"
-                        #         }
-                        #     }
-                        # else:
+                        # Authorization is Proxmox's to decide: the connection
+                        # is opened as the caller, so a denied operation comes
+                        # back as a 403 from the API itself.
                         reset_type = data.get("ResetType", "")
                         if reset_type == "On":
                             response, status_code = power_on(proxmox, vm_id)
