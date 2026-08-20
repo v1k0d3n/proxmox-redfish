@@ -6,6 +6,7 @@ from typing import Any, Dict, Tuple, Union
 
 from proxmoxer import ProxmoxAPI
 
+from ..config.logging_config import logger
 from ..config.settings import PROXMOX_NODE
 from ..utils.error_handling import handle_proxmox_error
 
@@ -92,6 +93,13 @@ def get_vm_status(proxmox: ProxmoxAPI, vm_id: int) -> Union[Dict[str, Any], Tupl
             "Actions": actions_field,
             "Links": {"ManagedBy": [{"@odata.id": f"/redfish/v1/Managers/{vm_id}"}]},
         }
+
+        # UUID and friends are standard ComputerSystem properties. Redfish
+        # defines UUID as matching the SMBIOS UUID byte for byte, which is
+        # exactly what Proxmox records, and clients use it to tie a system
+        # back to an inventory record.
+        response.update(parse_smbios1(config.get("smbios1", "")))
+
         return response
     except Exception as e:
         return handle_proxmox_error("VM status retrieval", e, vm_id)
@@ -114,81 +122,60 @@ def get_bios(proxmox: ProxmoxAPI, vm_id: int) -> Union[Dict[str, Any], Tuple[Dic
             "Name": "BIOS Settings",
             "FirmwareMode": firmware_mode,  # From previous enhancement
             "Attributes": {"BootOrder": config.get("boot", "order=scsi0;ide2;net0")},
-            "Links": {"SMBIOS": {"@odata.id": f"/redfish/v1/Systems/{vm_id}/Bios/SMBIOS"}},
         }
         return response
     except Exception as e:
         return handle_proxmox_error("BIOS retrieval", e, vm_id)
 
 
-def get_smbios_type1(proxmox: ProxmoxAPI, vm_id: int) -> Union[Dict[str, Any], Tuple[Dict[str, Any], int]]:
+# SMBIOS type 1 fields Proxmox can carry, mapped to the ComputerSystem
+# properties Redfish defines for them. `version` and `family` have no
+# standard equivalent, so they are not surfaced.
+SMBIOS_TO_REDFISH = {
+    "uuid": "UUID",
+    "manufacturer": "Manufacturer",
+    "product": "Model",
+    "serial": "SerialNumber",
+    "sku": "SKU",
+}
+
+
+def parse_smbios1(smbios1: str) -> Dict[str, str]:
+    """Parse Proxmox's `smbios1` option into Redfish ComputerSystem properties.
+
+    The option is a comma-separated list of key=value pairs. When it carries
+    `base64=1` the string values are base64-encoded -- and only then. Decoding
+    opportunistically would corrupt any plain value that happened to be valid
+    base64, which plenty of short serials are.
+
+    Only keys that are present are returned, so a property is omitted rather
+    than reported as null when Proxmox has nothing to say about it.
     """
-    Retrieve SMBIOS Type 1 (System Information) data from Proxmox VM config,
-    including firmware type (BIOS or UEFI).
-    """
-    try:
-        config = proxmox.nodes(PROXMOX_NODE).qemu(vm_id).config.get()
-        if config is None:
-            return handle_proxmox_error("SMBIOS retrieval", Exception("Failed to retrieve VM configuration"), vm_id)
-        smbios1 = config.get("smbios1", "")
-        firmware_type = config.get("bios", "seabios")  # Default to seabios if not specified
+    if not smbios1:
+        return {}
 
-        # Map Proxmox bios setting to Redfish-friendly terms
-        firmware_mode = "BIOS" if firmware_type == "seabios" else "UEFI"
+    fields = {}
+    for entry in smbios1.split(","):
+        if "=" in entry:
+            key, value = entry.split("=", 1)
+            fields[key.strip()] = value
 
-        # Default SMBIOS values
-        smbios_data = {
-            "UUID": None,
-            "Manufacturer": "Proxmox",
-            "ProductName": "QEMU Virtual Machine",
-            "Version": None,
-            "SerialNumber": None,
-            "SKUNumber": None,
-            "Family": None,
-        }
+    encoded = fields.pop("base64", "0") == "1"
 
-        # Parse smbios1 string if it exists
-        if smbios1:
-            smbios_entries = smbios1.split(",")
-            for entry in smbios_entries:
-                if "=" in entry:
-                    key, value = entry.split("=", 1)
+    properties: Dict[str, str] = {}
+    for key, redfish_name in SMBIOS_TO_REDFISH.items():
+        value = fields.get(key)
+        if not value:
+            continue
+        # A uuid is never encoded; Proxmox stores it in canonical form.
+        if encoded and key != "uuid":
+            try:
+                value = base64.b64decode(value).decode("utf-8")
+            except (binascii.Error, UnicodeDecodeError):
+                logger.warning("Could not decode SMBIOS field %s, using it as-is", key)
+        properties[redfish_name] = value
 
-                    # Attempt to decode Base64 if it looks encoded
-                    try:
-                        decoded_value = base64.b64decode(value).decode("utf-8")
-                        # Only use decoded value if it's valid UTF-8 and not a UUID
-                        if key != "uuid" and decoded_value.isprintable():
-                            value = decoded_value
-                    except (binascii.Error, UnicodeDecodeError):
-                        pass  # Keep original value if decoding fails
-
-                    if key == "uuid":
-                        smbios_data["UUID"] = value
-                    elif key == "manufacturer":
-                        smbios_data["Manufacturer"] = value
-                    elif key == "product":
-                        smbios_data["ProductName"] = value
-                    elif key == "version":
-                        smbios_data["Version"] = value
-                    elif key == "serial":
-                        smbios_data["SerialNumber"] = value
-                    elif key == "sku":
-                        smbios_data["SKUNumber"] = value
-                    elif key == "family":
-                        smbios_data["Family"] = value
-
-        response = {
-            "@odata.id": f"/redfish/v1/Systems/{vm_id}/Bios/SMBIOS",
-            "@odata.type": "#Bios.v1_0_0.Bios",
-            "Id": "SMBIOS",
-            "Name": "SMBIOS System Information",
-            "FirmwareMode": firmware_mode,  # New field to indicate BIOS or UEFI
-            "Attributes": {"SMBIOSType1": smbios_data},
-        }
-        return response
-    except Exception as e:
-        return handle_proxmox_error("SMBIOS retrieval", e, vm_id)
+    return properties
 
 
 def get_vm_config(proxmox: ProxmoxAPI, vm_id: int) -> Union[Dict[str, Any], Tuple[Dict[str, Any], int]]:
