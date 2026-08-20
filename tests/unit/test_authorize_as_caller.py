@@ -104,3 +104,36 @@ class TestGetProxmoxApiUsesCallerIdentity(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestStartupRequiresNoServiceAccount(unittest.TestCase):
+    """The daemon holds no Proxmox account, so it must not demand one.
+
+    Requiring PROXMOX_USER/PROXMOX_PASSWORD to start would mean keeping a
+    privileged credential on disk that nothing reads.
+    """
+
+    def _run_main(self, env):
+        import proxmox_redfish.main as main_module
+
+        with (
+            patch.dict("os.environ", env, clear=True),
+            patch.object(main_module.sys, "argv", ["proxmox-redfish"]),
+            patch.object(main_module, "setup_logging"),
+            patch.object(main_module, "run_server") as serve,
+        ):
+            try:
+                main_module.main()
+            except SystemExit as exc:
+                return exc.code, serve
+            return 0, serve
+
+    def test_starts_with_only_a_host_configured(self):
+        code, serve = self._run_main({"PROXMOX_HOST": "proxmox.example"})
+        self.assertEqual(code, 0)
+        serve.assert_called_once()
+
+    def test_exits_when_the_host_is_missing(self):
+        code, serve = self._run_main({})
+        self.assertEqual(code, 1)
+        serve.assert_not_called()
