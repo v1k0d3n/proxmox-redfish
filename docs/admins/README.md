@@ -108,6 +108,36 @@ cat > /opt/proxmox-redfish/config/config.json << 'EOF'
 EOF
 ```
 
+## ISO Storage
+
+`PROXMOX_ISO_STORAGE` names the storage that `VirtualMedia.InsertMedia`
+uploads to when it is given an image URL. It defaults to `local` because
+that is the storage Proxmox creates by default, but any storage name is
+accepted and nothing in the daemon treats `local` specially.
+
+The storage must be file-backed, since an ISO is a file. Proxmox reports a
+filesystem path for these types, and the daemon uses `<path>/template/iso`:
+
+| Type | Usable | Notes |
+|---|---|---|
+| `dir` | yes | path is whatever the operator configured |
+| `nfs`, `cifs` | yes | mounted at `/mnt/pve/<name>`, and can be shared between nodes |
+| `cephfs`, `glusterfs` | yes | likewise |
+| `zfspool`, `lvm`, `lvmthin`, `rbd`, `iscsi` | no | block storage, no filesystem path |
+
+Configuring a block storage is rejected with an error naming its type, since
+no ISO can be written there.
+
+A storage with `shared: 1` is visible from every node in a cluster, so an
+image uploaded once can be attached to a VM wherever it runs. A node-local
+`dir` storage only serves VMs on that node.
+
+The calling account needs `Datastore.AllocateTemplate` to upload, and
+`Datastore.Audit` to see the storage at all. A storage the caller cannot see
+is reported as not found — the storage list Proxmox returns is filtered by
+the caller's permissions.
+
+
 ## Proxmox Permissions
 
 The daemon connects to Proxmox as the account that made the Redfish

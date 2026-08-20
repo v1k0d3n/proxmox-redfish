@@ -31,6 +31,9 @@ class IsoUploadRefusalTest(unittest.TestCase):
     def _run(self, upload_error):
         """Drive the function to the upload step and report what happened."""
         proxmox = MagicMock()
+        # The ISO directory is located from the /storage collection; the
+        # upload itself is a per-node call.
+        proxmox.storage.get.return_value = [{"storage": "local", "type": "dir", "path": "/var/lib/vz"}]
         proxmox.nodes.return_value.storage.return_value.upload.post.side_effect = upload_error
 
         with (
