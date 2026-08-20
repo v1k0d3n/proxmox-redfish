@@ -48,11 +48,6 @@ jobs:
         echo "Running isort check..."
         isort --check-only src/ tests/ --line-length=120
 
-    - name: Verify the package still matches the pre-refactor monolith
-      run: |
-        echo "Running extraction check..."
-        python tools/check_extraction.py --monolith-rev bc074ad --quiet
-
     - name: Run type checking
       run: |
         echo "Running mypy..."

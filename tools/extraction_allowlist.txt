@@ -6,6 +6,11 @@
 #
 #   python tools/check_extraction.py --monolith-rev bc074ad
 #
+# Needs full git history, so it does not run in CI (shallow checkout), and
+# it is a migration-time gate rather than an ongoing one. If that commit is
+# no longer reachable -- a squash merge would do it -- use any commit that
+# still contains the pre-split proxmox_redfish.py.
+#
 # Format:  function_name: why the difference is correct
 
 atomic_file_write: `import shutil` hoisted from inside the function to module scope; same call, no behavioural change.

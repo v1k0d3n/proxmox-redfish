@@ -8,6 +8,17 @@ changes in behaviour are not.
 
 Run it after each refactor step; anything reported as DIFFERS is either
 a deliberate change that needs justifying or an accident.
+
+This is a migration-time gate, not a permanent CI check. It answers one
+question -- "did the split change any behaviour?" -- and once the answer
+is settled the codebase is expected to move on from the monolith, at
+which point every legitimate change would need an allowlist entry. It is
+deliberately not wired into CI. It also needs full git history to read
+the baseline, which a shallow CI checkout does not have.
+
+    python tools/check_extraction.py --monolith-rev <last commit with the monolith>
+
+Keep the tool so the verification can be reproduced or audited later.
 """
 
 import argparse
