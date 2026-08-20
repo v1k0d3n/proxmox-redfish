@@ -569,6 +569,7 @@ def _ensure_iso_available(proxmox: ProxmoxAPI, url_or_volid: str) -> str:
 
         with file_lock:
             logger.info("Acquired lock for ISO file: %s", fname)
+            needs_upload = False
 
             # Check if file already exists and compare hashes
             iso_path = os.path.join(storage_path, fname)
@@ -615,10 +616,18 @@ def _ensure_iso_available(proxmox: ProxmoxAPI, url_or_volid: str) -> str:
                             fname = f"{name_without_ext}_{downloaded_hash_hex[:8]}{ext}"
                             iso_path = os.path.join(storage_path, fname)
                             logger.info("Using unique filename: %s", fname)
+                            # Need to upload the new file with hash suffix
+                            needs_upload = True
                     else:
                         logger.warning("Could not calculate hash of existing file, proceeding with upload")
+                        needs_upload = True
             else:
-                logger.info("ISO file does not exist, downloading: %s", fname)
+                logger.info("ISO file does not exist, will download: %s", fname)
+                needs_upload = True
+
+            # Upload the ISO if needed (either new file or hash-suffixed file)
+            if needs_upload:
+                logger.info("ISO file needs to be uploaded: %s", fname)
                 # Download the ISO
                 resp = requests.get(url_or_volid, stream=True, timeout=(30, 1800), verify=VERIFY_SSL)
                 resp.raise_for_status()
