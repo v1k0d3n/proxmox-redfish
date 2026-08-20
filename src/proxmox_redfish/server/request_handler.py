@@ -631,13 +631,24 @@ class RedfishRequestHandler(BaseHTTPRequestHandler):
                                 logger.debug(f"VM {vm_id} status: {status['status']}")
                             except Exception as e:
                                 logger.error(f"Failed to get VM {vm_id} status: {str(e)}")
-                                status_code = 500
-                                response = {
-                                    "error": {
-                                        "code": "Base.1.0.GeneralError",
-                                        "message": f"Failed to get VM status: {str(e)}",
-                                    }
-                                }
+                                # Reported through the shared handler so an
+                                # unknown id becomes 404 rather than 500, and so
+                                # this path answers like every other. Returning
+                                # here matters: `status` is unset on this branch,
+                                # and the code below dereferences it.
+                                response, status_code = handle_proxmox_error("VM status retrieval", e, vm_id)
+                                response_body = json.dumps(response).encode("utf-8")
+                                self.send_response(status_code)
+                                self.send_header("Content-Type", "application/json")
+                                self.send_header("Content-Length", str(len(response_body)))
+                                self.send_header("Connection", "close")
+                                self.end_headers()
+                                self.wfile.write(response_body)
+                                logger.debug(
+                                    f"PATCH Response: path={self.path}, status={status_code}, "
+                                    f"body={json.dumps(redact_response(self.path, response))}"
+                                )
+                                return
 
                             redfish_status = {
                                 "running": "On",
