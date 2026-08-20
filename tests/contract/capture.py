@@ -22,7 +22,6 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import requests
 import urllib3
-
 from catalog import Endpoint, mutating, read_only, unauthenticated
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)

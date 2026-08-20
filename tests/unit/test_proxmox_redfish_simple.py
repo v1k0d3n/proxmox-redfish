@@ -281,11 +281,11 @@ class TestRedfishProxmox(unittest.TestCase):
         headers = {"Authorization": f"Basic {encoded_credentials}"}
 
         # Mock the authenticate_user function to return True
-        with patch("proxmox_redfish.proxmox_redfish.authenticate_user") as mock_auth:
+        with patch("proxmox_redfish.auth.authentication.authenticate_user") as mock_auth:
             mock_auth.return_value = True
 
             # Mock the AUTH variable directly in the validate_token function
-            with patch("proxmox_redfish.proxmox_redfish.AUTH", "Basic"):
+            with patch("proxmox_redfish.auth.authentication.AUTH", "Basic"):
                 valid, message = validate_token(headers)
                 self.assertTrue(valid)
                 self.assertEqual(message, self.test_username)
@@ -295,7 +295,7 @@ class TestRedfishProxmox(unittest.TestCase):
         headers = {"X-Auth-Token": self.test_token}
 
         # Mock sessions
-        import proxmox_redfish.proxmox_redfish as rfp
+        import proxmox_redfish.auth.authentication as rfp
 
         original_sessions = rfp.sessions
         rfp.sessions = {
@@ -304,7 +304,7 @@ class TestRedfishProxmox(unittest.TestCase):
 
         try:
             # Mock the AUTH variable to use Session authentication
-            with patch("proxmox_redfish.proxmox_redfish.AUTH", "Session"):
+            with patch("proxmox_redfish.auth.authentication.AUTH", "Session"):
                 valid, message = validate_token(headers)
                 self.assertTrue(valid)
                 self.assertEqual(message, self.test_username)
@@ -316,7 +316,7 @@ class TestRedfishProxmox(unittest.TestCase):
         headers = {"X-Auth-Token": "invalid-token"}
 
         # Mock the AUTH variable to use Session authentication
-        with patch("proxmox_redfish.proxmox_redfish.AUTH", "Session"):
+        with patch("proxmox_redfish.auth.authentication.AUTH", "Session"):
             valid, message = validate_token(headers)
             self.assertFalse(valid)
             self.assertIn("Invalid", message)
@@ -375,7 +375,7 @@ class TestRedfishProxmox(unittest.TestCase):
 
         # Test with a URL - just verify the function handles it without hanging
         # We'll skip the actual URL processing to avoid network requests
-        with patch("proxmox_redfish.proxmox_redfish._ensure_iso_available") as mock_func:
+        with patch("proxmox_redfish.api.virtual_media._ensure_iso_available") as mock_func:
             mock_func.return_value = "local:iso/downloaded.iso"
             result = mock_func(mock_proxmox, iso_url)
             self.assertEqual(result, "local:iso/downloaded.iso")

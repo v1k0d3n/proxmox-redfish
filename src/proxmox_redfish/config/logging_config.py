@@ -8,6 +8,7 @@ import os
 # Logging configuration with configurable levels
 logger = logging.getLogger("proxmox-redfish")
 
+
 def setup_logging() -> None:
     """Setup logging configuration based on environment variables."""
     # Get logging level from environment variable
@@ -43,4 +44,4 @@ def setup_logging() -> None:
         logger.info("Proxmox-Redfish daemon started with log level: %s", log_level_str)
     else:
         logger.handlers = [logging.NullHandler()]
-        print("Logging disabled via REDFISH_LOGGING_ENABLED=false") 
+        print("Logging disabled via REDFISH_LOGGING_ENABLED=false")

@@ -13,6 +13,7 @@ a deliberate change that needs justifying or an accident.
 import argparse
 import ast
 import pathlib
+import subprocess
 import sys
 from typing import Dict, List, Tuple
 
@@ -30,6 +31,25 @@ def _definitions(tree: ast.Module) -> Dict[str, Node]:
 
 def _parse(path: pathlib.Path) -> ast.Module:
     return ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+
+
+def _parse_rev(rev: str, path: str) -> ast.Module:
+    """Parse a file as it existed at a git revision.
+
+    proxmox_redfish.py is a re-export facade on disk now, so the baseline
+    for this comparison has to come from the last commit where it still
+    held the implementation.
+    """
+    try:
+        source = subprocess.run(
+            ["git", "show", f"{rev}:{path}"],
+            capture_output=True,
+            check=True,
+            text=True,
+        ).stdout
+    except subprocess.CalledProcessError as exc:
+        raise SystemExit(f"could not read {path} at {rev}: {exc.stderr.strip()}")
+    return ast.parse(source, filename=f"{rev}:{path}")
 
 
 def _strip_docstrings(node: Node) -> None:
@@ -57,8 +77,15 @@ def _normalize(node: Node) -> str:
     return ast.dump(clone, include_attributes=False)
 
 
-def compare(monolith: pathlib.Path, package: pathlib.Path) -> Tuple[List[str], List[str], List[str]]:
-    baseline = _definitions(_parse(monolith))
+def compare(
+    monolith: pathlib.Path,
+    package: pathlib.Path,
+    rev: str = "",
+) -> Tuple[List[str], List[str], List[str]]:
+    if rev:
+        baseline = _definitions(_parse_rev(rev, str(monolith)))
+    else:
+        baseline = _definitions(_parse(monolith))
 
     modular: Dict[str, Tuple[str, Node]] = {}
     for path in sorted(package.rglob("*.py")):
@@ -84,6 +111,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--monolith", default="src/proxmox_redfish/proxmox_redfish.py")
     parser.add_argument("--package", default="src/proxmox_redfish")
+    parser.add_argument(
+        "--monolith-rev",
+        default="",
+        help="Read the monolith from this git revision instead of the working tree",
+    )
     parser.add_argument("--quiet", action="store_true", help="Only list problems")
     parser.add_argument(
         "--allow",
@@ -102,7 +134,7 @@ def main() -> int:
             name, _, why = line.partition(":")
             allowed[name.strip()] = why.strip()
 
-    same, differs, missing = compare(pathlib.Path(args.monolith), pathlib.Path(args.package))
+    same, differs, missing = compare(pathlib.Path(args.monolith), pathlib.Path(args.package), args.monolith_rev)
 
     if not args.quiet:
         for entry in same:
@@ -121,8 +153,7 @@ def main() -> int:
 
     accepted = len(differs) - len(unexpected)
     print(
-        f"\n{len(same)} identical, {accepted} allowed, "
-        f"{len(unexpected)} unexpected, {len(missing)} not extracted"
+        f"\n{len(same)} identical, {accepted} allowed, " f"{len(unexpected)} unexpected, {len(missing)} not extracted"
     )
     return 1 if (unexpected or missing) else 0
 

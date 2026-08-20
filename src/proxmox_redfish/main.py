@@ -12,7 +12,7 @@ import logging
 import os
 import sys
 
-from .config.logging_config import setup_logging, logger
+from .config.logging_config import logger, setup_logging
 from .server.http_server import run_server
 from .server.ssl_server import run_server_ssl
 
@@ -115,4 +115,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main() 
+    main()

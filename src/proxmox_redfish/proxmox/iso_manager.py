@@ -4,7 +4,6 @@ import hashlib
 import os
 import tempfile
 import time
-from typing import Dict, Any
 
 import requests
 from proxmoxer import ProxmoxAPI
@@ -16,8 +15,8 @@ from ..config.settings import (
     VERIFY_SSL,
 )
 from ..utils.file_operations import (
-    get_file_lock,
     atomic_file_write,
+    get_file_lock,
     safe_file_hash,
 )
 
@@ -188,4 +187,4 @@ def _ensure_iso_available(proxmox: ProxmoxAPI, url_or_volid: str) -> str:
 
     # Not a URL and not a storage reference - return as-is (Proxmox will handle validation)
     logger.warning("Unknown ISO format: %s", url_or_volid)
-    return url_or_volid 
+    return url_or_volid

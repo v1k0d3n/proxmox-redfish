@@ -1,11 +1,11 @@
 """SSL server for the Proxmox Redfish daemon."""
 
 import os
-import ssl
 import socketserver
+import ssl
 
 from ..config.logging_config import logger
-from ..config.settings import SSL_CERT_FILE, SSL_KEY_FILE, SSL_CA_FILE
+from ..config.settings import SSL_CA_FILE, SSL_CERT_FILE, SSL_KEY_FILE
 from .request_handler import RedfishRequestHandler
 
 
@@ -38,4 +38,4 @@ def run_server_ssl(port: int = 443) -> None:
 
     print(f"Redfish server running on port {port} with SSL...")
     logger.info(f"Redfish server started on port {port} with SSL certificates")
-    httpd.serve_forever() 
+    httpd.serve_forever()

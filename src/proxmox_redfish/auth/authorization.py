@@ -1,7 +1,5 @@
 """Authorization functions for the Proxmox Redfish daemon."""
 
-from typing import Any
-
 from proxmoxer import ProxmoxAPI
 
 from ..config.logging_config import logger
@@ -81,4 +79,4 @@ def check_user_vm_permission(proxmox: ProxmoxAPI, username: str, vm_id: int) -> 
     except Exception as e:
         logger.warning(f"Failed to check permissions for user {username} on VM {vm_id}: {str(e)}")
         # In case of error, deny access for security
-        return False 
+        return False

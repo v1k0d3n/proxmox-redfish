@@ -4,7 +4,6 @@ import fcntl
 import hashlib
 import os
 import shutil
-import tempfile
 import threading
 from typing import Optional
 
@@ -76,4 +75,4 @@ def safe_file_hash(file_path: str, timeout: int = 60) -> Optional[str]:
         return hash_obj.hexdigest()
     except Exception as e:
         logger.warning("Failed to calculate hash for %s: %s", file_path, str(e))
-        return None 
+        return None

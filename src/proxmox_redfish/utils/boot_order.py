@@ -1,7 +1,5 @@
 """Boot order management utilities for the Proxmox Redfish daemon."""
 
-from typing import Dict, Any
-
 from proxmoxer import ProxmoxAPI
 
 from ..config.logging_config import logger
@@ -77,4 +75,4 @@ def reorder_boot_order(proxmox: ProxmoxAPI, vm_id: int, current_order: str, targ
         return result
     except Exception as e:
         logger.error(f"Failed to reorder boot order for VM {vm_id}: {str(e)}")
-        raise 
+        raise

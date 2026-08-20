@@ -4,8 +4,6 @@ from typing import Any, Dict, Optional, Tuple, Union
 
 from proxmoxer.core import ResourceException
 
-from ..config.logging_config import logger
-
 
 def handle_proxmox_error(
     operation: str, exception: Exception, vm_id: Optional[Union[str, int]] = None
@@ -73,4 +71,4 @@ def handle_proxmox_error(
             "message": f"{operation} failed: {message}",
             "@Message.ExtendedInfo": extended_info,
         }
-    }, status_code 
+    }, status_code

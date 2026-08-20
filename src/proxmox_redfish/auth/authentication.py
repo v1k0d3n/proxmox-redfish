@@ -9,8 +9,8 @@ import requests
 from ..config.logging_config import logger
 from ..config.settings import (
     AUTH,
-    PROXMOX_HOST,
     PROXMOX_API_PORT,
+    PROXMOX_HOST,
     VERIFY_SSL,
 )
 
@@ -113,4 +113,4 @@ def validate_token(headers: Any) -> Tuple[bool, str]:
         else:
             return False, "Invalid or no token provided"
     else:
-        return False, "Invalid authentication method" 
+        return False, "Invalid authentication method"

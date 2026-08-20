@@ -81,4 +81,4 @@ def manage_virtual_media(
 
     except Exception as e:
         logger.error("VirtualMedia %s failed for VM %s: %s", action, vm_id, str(e), exc_info=True)
-        return handle_proxmox_error(f"Virtual Media {action}", e, vm_id) 
+        return handle_proxmox_error(f"Virtual Media {action}", e, vm_id)

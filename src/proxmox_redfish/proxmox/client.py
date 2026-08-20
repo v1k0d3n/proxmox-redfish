@@ -5,11 +5,10 @@ from typing import Any
 from proxmoxer import ProxmoxAPI
 
 from ..auth.authentication import validate_token
-from ..config.logging_config import logger
 from ..config.settings import (
     PROXMOX_HOST,
-    PROXMOX_USER,
     PROXMOX_PASSWORD,
+    PROXMOX_USER,
     VERIFY_SSL,
 )
 
@@ -32,4 +31,4 @@ def get_proxmox_api(headers: Any) -> ProxmoxAPI:
         )
         return proxmox
     except Exception as e:
-        raise Exception(f"Failed to connect to Proxmox API: {str(e)}") 
+        raise Exception(f"Failed to connect to Proxmox API: {str(e)}")

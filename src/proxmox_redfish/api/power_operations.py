@@ -137,4 +137,4 @@ def stop_vm(proxmox: ProxmoxAPI, vm_id: int) -> Tuple[Dict[str, Any], int]:
             "Messages": [{"Message": f"Hard stop request initiated for VM {vm_id}"}],
         }, 202
     except Exception as e:
-        return handle_proxmox_error("Hard stop", e, vm_id) 
+        return handle_proxmox_error("Hard stop", e, vm_id)

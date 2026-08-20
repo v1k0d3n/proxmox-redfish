@@ -4,7 +4,6 @@ from typing import Any, Dict, Tuple
 
 from proxmoxer import ProxmoxAPI
 
-from ..config.logging_config import logger
 from ..config.settings import PROXMOX_NODE
 from ..utils.error_handling import handle_proxmox_error
 
@@ -23,4 +22,4 @@ def update_vm_config(proxmox: ProxmoxAPI, vm_id: int, config_data: Dict[str, Any
             "Messages": [{"Message": f"Configuration update initiated for VM {vm_id}"}],
         }, 202  # 202 Accepted indicates an asynchronous task
     except Exception as e:
-        return handle_proxmox_error("Update Configuration", e, vm_id) 
+        return handle_proxmox_error("Update Configuration", e, vm_id)

@@ -2,11 +2,10 @@
 
 import base64
 import binascii
-from typing import Any, Dict, Union, Tuple
+from typing import Any, Dict, Tuple, Union
 
 from proxmoxer import ProxmoxAPI
 
-from ..config.logging_config import logger
 from ..config.settings import PROXMOX_NODE
 from ..utils.error_handling import handle_proxmox_error
 
@@ -573,4 +572,4 @@ def get_manager(proxmox: ProxmoxAPI, manager_id: int) -> Union[Dict[str, Any], T
         }
         return response
     except Exception as e:
-        return handle_proxmox_error("Manager retrieval", e, manager_id) 
+        return handle_proxmox_error("Manager retrieval", e, manager_id)

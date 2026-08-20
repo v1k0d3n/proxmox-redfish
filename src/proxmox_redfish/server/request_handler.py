@@ -9,40 +9,39 @@ from typing import Any, Dict, Tuple, Union
 
 from proxmoxer import ProxmoxAPI
 
+from ..api.power_operations import (
+    power_off,
+    power_on,
+    reboot,
+    reset_vm,
+    resume_vm,
+    stop_vm,
+    suspend_vm,
+)
 from ..api.redfish_endpoints import (
-    get_vm_status,
     get_bios,
-    get_smbios_type1,
-    get_vm_config,
+    get_controller_collection,
+    get_drive_detail,
+    get_ethernet_interface_collection,
+    get_ethernet_interface_detail,
+    get_manager,
     get_processor_collection,
     get_processor_detail,
     get_storage_collection,
     get_storage_detail,
-    get_drive_detail,
-    get_volume_collection,
-    get_controller_collection,
-    get_ethernet_interface_collection,
-    get_ethernet_interface_detail,
     get_virtual_media,
-    get_manager,
-)
-from ..api.power_operations import (
-    power_on,
-    power_off,
-    reboot,
-    reset_vm,
-    suspend_vm,
-    resume_vm,
-    stop_vm,
+    get_vm_status,
+    get_volume_collection,
 )
 from ..api.virtual_media import manage_virtual_media
-from ..auth.authentication import validate_token, sessions
+from ..auth.authentication import sessions, validate_token
 from ..config.logging_config import logger
 from ..config.settings import AUTH, PROXMOX_HOST, PROXMOX_NODE, VERIFY_SSL
 from ..proxmox.client import get_proxmox_api
 from ..proxmox.vm_operations import update_vm_config
 from ..utils.boot_order import reorder_boot_order
 from ..utils.error_handling import handle_proxmox_error
+from ..utils.redaction import redact_headers, redact_payload, redact_response
 
 
 class RedfishRequestHandler(BaseHTTPRequestHandler):
@@ -51,7 +50,7 @@ class RedfishRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         """Handle GET requests."""
         # Log request details
-        headers_str = "\n".join(f"{k}: {v}" for k, v in self.headers.items())
+        headers_str = redact_headers(self.headers.items())
         logger.debug(f"GET Request: path={self.path}, headers=\n{headers_str}")
 
         path = self.path.rstrip("/")
@@ -221,7 +220,9 @@ class RedfishRequestHandler(BaseHTTPRequestHandler):
         self.send_header("Connection", "close")
         self.end_headers()
         self.wfile.write(response_body)
-        logger.debug(f"GET Response: path={self.path}, status={status_code}, body={json.dumps(response)}")
+        logger.debug(
+            f"GET Response: path={self.path}, status={status_code}, body={json.dumps(redact_response(self.path, response))}"
+        )
 
     def do_POST(self) -> None:
         """Handle POST requests."""
@@ -238,9 +239,9 @@ class RedfishRequestHandler(BaseHTTPRequestHandler):
         except UnicodeDecodeError:
             post_data_str = "<Non-UTF-8 data>"
             payload = post_data_str
-        headers_str = "\n".join(f"{k}: {v}" for k, v in self.headers.items())
+        headers_str = redact_headers(self.headers.items())
         logger.debug(
-            f"POST Request: path={self.path}\nHeaders:\n{headers_str}\nPayload:\n{json.dumps(payload, indent=2)}"
+            f"POST Request: path={self.path}\nHeaders:\n{headers_str}\nPayload:\n{json.dumps(redact_payload(payload), indent=2)}"
         )
 
         path = self.path
@@ -311,7 +312,7 @@ class RedfishRequestHandler(BaseHTTPRequestHandler):
                         self.wfile.write(response_body)
                         # Log response
                         logger.debug(
-                            f"POST Response: path={self.path}, status={status_code}, body={json.dumps(response)}"
+                            f"POST Response: path={self.path}, status={status_code}, body={json.dumps(redact_response(self.path, response))}"
                         )
                         return
 
@@ -417,7 +418,9 @@ class RedfishRequestHandler(BaseHTTPRequestHandler):
         self.wfile.write(json.dumps(response).encode("utf-8"))
 
         # Log response
-        logger.debug(f"POST Response: path={self.path}, status={status_code}, body={json.dumps(response)}")
+        logger.debug(
+            f"POST Response: path={self.path}, status={status_code}, body={json.dumps(redact_response(self.path, response))}"
+        )
 
     def do_PATCH(self) -> None:
         """Handle PATCH requests."""
@@ -433,9 +436,9 @@ class RedfishRequestHandler(BaseHTTPRequestHandler):
         except UnicodeDecodeError:
             post_data_str = "<Non-UTF-8 data>"
             payload = post_data_str
-        headers_str = "\n".join(f"{k}: {v}" for k, v in self.headers.items())
+        headers_str = redact_headers(self.headers.items())
         logger.debug(
-            f"PATCH Request: path={self.path}\nHeaders:\n{headers_str}\nPayload:\n{json.dumps(payload, indent=2)}"
+            f"PATCH Request: path={self.path}\nHeaders:\n{headers_str}\nPayload:\n{json.dumps(redact_payload(payload), indent=2)}"
         )
 
         path = self.path.rstrip("/")
@@ -468,7 +471,9 @@ class RedfishRequestHandler(BaseHTTPRequestHandler):
                 self.send_header("Connection", "close")
                 self.end_headers()
                 self.wfile.write(response_body)
-                logger.debug(f"PATCH Response: path={self.path}, status={status_code}, body={json.dumps(response)}")
+                logger.debug(
+                    f"PATCH Response: path={self.path}, status={status_code}, body={json.dumps(redact_response(self.path, response))}"
+                )
                 return
 
             if len(parts) == 6 and parts[5] == "Bios":  # /redfish/v1/Systems/<vm_id>/Bios
@@ -565,7 +570,7 @@ class RedfishRequestHandler(BaseHTTPRequestHandler):
                             self.end_headers()
                             self.wfile.write(response_body)
                             logger.debug(
-                                f"PATCH Response: path={self.path}, status={status_code}, body={json.dumps(response)}"
+                                f"PATCH Response: path={self.path}, status={status_code}, body={json.dumps(redact_response(self.path, response))}"
                             )
                             return
                     if "Boot" in data:
@@ -723,4 +728,6 @@ class RedfishRequestHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(response_body)
 
-        logger.debug(f"PATCH Response: path={self.path}, status={status_code}, body={json.dumps(response)}") 
+        logger.debug(
+            f"PATCH Response: path={self.path}, status={status_code}, body={json.dumps(redact_response(self.path, response))}"
+        )

@@ -23,4 +23,4 @@ SSL_CA_FILE = os.getenv("SSL_CA_FILE", "/opt/redfish_daemon/config/ssl/ca.crt") 
 # -A <Authn>, --Auth <Authn> -- Authentication type to use:  Authn={ None | Basic | Session (default) }
 # -S <Secure>, --Secure=<Secure> -- <Secure>={ None | Always (default) }
 AUTH = "Basic"
-SECURE = "Always" 
+SECURE = "Always"
