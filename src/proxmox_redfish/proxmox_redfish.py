@@ -78,14 +78,12 @@ from .auth.authentication import (
 from .config.logging_config import logger, setup_logging
 from .config.settings import (
     AUTH,
-    AUTOLOAD,
     PROXMOX_API_PORT,
     PROXMOX_HOST,
     PROXMOX_ISO_STORAGE,
     PROXMOX_NODE,
     PROXMOX_PASSWORD,
     PROXMOX_USER,
-    SECURE,
     SSL_CA_FILE,
     SSL_CERT_FILE,
     SSL_KEY_FILE,
@@ -111,7 +109,6 @@ from .utils.file_operations import (
 
 __all__ = [
     "AUTH",
-    "AUTOLOAD",
     "PROXMOX_API_PORT",
     "PROXMOX_HOST",
     "PROXMOX_ISO_STORAGE",
@@ -120,7 +117,6 @@ __all__ = [
     "PROXMOX_USER",
     "ProxmoxAPI",
     "RedfishRequestHandler",
-    "SECURE",
     "SSL_CA_FILE",
     "SSL_CERT_FILE",
     "SSL_KEY_FILE",

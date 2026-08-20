@@ -72,7 +72,6 @@ proxmox-redfish/
 ├── requirements.txt                # Runtime dependencies
 ├── requirements-dev.txt            # Development dependencies
 ├── pyproject.toml                  # Project configuration
-└── setup.py                        # Package setup
 ```
 
 ### Key Components
