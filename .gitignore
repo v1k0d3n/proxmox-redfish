@@ -45,9 +45,17 @@ config/proxmox-redfish.service
 .DS_Store
 Thumbs.db
 
-# Logs
+# Logs.
+# Daemon logs contain Authorization headers, so a stray capture left in a
+# working tree is a credential disclosure waiting for `git add -A`. Match
+# the plural and dotted variants too -- redfish.logs and ironic.logs have
+# both turned up on a deployed host, world-readable and untracked.
 *.log
+*.logs
+*.log.*
 logs/
+redfish.logs
+ironic.logs
 
 # Test coverage
 .coverage
