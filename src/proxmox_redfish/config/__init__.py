@@ -2,14 +2,12 @@
 
 from .settings import (
     AUTH,
-    AUTOLOAD,
     PROXMOX_API_PORT,
     PROXMOX_HOST,
     PROXMOX_ISO_STORAGE,
     PROXMOX_NODE,
     PROXMOX_PASSWORD,
     PROXMOX_USER,
-    SECURE,
     SSL_CA_FILE,
     SSL_CERT_FILE,
     SSL_KEY_FILE,
@@ -24,10 +22,8 @@ __all__ = [
     "PROXMOX_API_PORT",
     "VERIFY_SSL",
     "PROXMOX_ISO_STORAGE",
-    "AUTOLOAD",
     "SSL_CERT_FILE",
     "SSL_KEY_FILE",
     "SSL_CA_FILE",
     "AUTH",
-    "SECURE",
 ]
