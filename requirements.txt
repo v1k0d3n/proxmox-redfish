@@ -1,14 +1,7 @@
-# Core dependencies
+# Runtime dependencies only.
+# Development and test tooling lives in requirements-dev.txt, or install
+# the package with its extra:  pip install -e ".[dev]"
+
 proxmoxer>=2.0.0
-requests>=2.25.0
-
-# Optional dependencies for enhanced functionality
-requests-toolbelt>=0.9.0  # For large file uploads
-
-# Development dependencies (optional)
-pytest>=6.0.0
-pytest-cov>=2.10.0
-black>=21.0.0
-flake8>=3.8.0
-isort>=5.0.0
-mypy>=0.900
+requests>=2.32.0
+requests-toolbelt>=1.0.0
