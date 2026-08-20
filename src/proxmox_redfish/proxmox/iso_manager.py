@@ -22,6 +22,43 @@ from ..utils.file_operations import (
 )
 
 
+def iso_directory(proxmox: ProxmoxAPI, storage_name: str) -> str:
+    """Return the filesystem directory holding ISOs for a storage.
+
+    The path is read from the /storage collection rather than the
+    /storage/{name} item. Both report it, but the item requires
+    Datastore.Allocate -- an administrative privilege over the storage
+    itself -- while the collection is readable by anyone with audit rights
+    and is filtered to the storages the caller may see. Requiring
+    Datastore.Allocate just to locate a directory would mean handing every
+    Redfish caller storage administration.
+
+    Not /nodes/{node}/storage/{name}: that returns a directory index of
+    sub-endpoints ({'subdir': 'content'} and friends), not configuration.
+    Its /status sub-resource is readable but reports no path.
+
+    Proxmox lays ISOs out under <path>/template/iso for every file-backed
+    storage type.
+    """
+    entries = proxmox.storage.get()
+    if not isinstance(entries, list):
+        raise ValueError("Unexpected response listing storages")
+
+    for entry in entries:
+        if entry.get("storage") != storage_name:
+            continue
+
+        path = entry.get("path")
+        if not path:
+            raise ValueError(
+                f"Storage {storage_name} has no filesystem path; "
+                f"it is type {entry.get('type', 'unknown')} and cannot hold ISOs"
+            )
+        return os.path.join(path, "template", "iso")
+
+    raise ValueError(f"Storage {storage_name} was not found, or the caller may not see it")
+
+
 def _ensure_iso_available(proxmox: ProxmoxAPI, url_or_volid: str) -> str:
     """
     Return a storage:iso/… volid, downloading + uploading if needed.
@@ -52,21 +89,10 @@ def _ensure_iso_available(proxmox: ProxmoxAPI, url_or_volid: str) -> str:
             fname += ".iso"  # Ensure .iso extension
 
         # Determine storage path for hash checking
-        if PROXMOX_ISO_STORAGE == "local":
-            storage_path = "/var/lib/vz/template/iso"
-        else:
-            # Try to get storage path from Proxmox API
-            try:
-                storage_info = proxmox.nodes(PROXMOX_NODE).storage(PROXMOX_ISO_STORAGE).get()
-                if isinstance(storage_info, dict):
-                    storage_path = storage_info.get("path", "")
-                else:
-                    storage_path = ""
-            except Exception:
-                storage_path = ""
-
-        if not storage_path:
-            raise Exception(f"Could not determine storage path for {PROXMOX_ISO_STORAGE}")
+        try:
+            storage_path = iso_directory(proxmox, PROXMOX_ISO_STORAGE)
+        except Exception as exc:
+            raise Exception(f"Could not determine storage path for {PROXMOX_ISO_STORAGE}: {exc}")
 
         # Get file-specific lock to prevent concurrent access to the same ISO
         file_lock = get_file_lock(fname)
