@@ -57,7 +57,6 @@ from .api.redfish_endpoints import (
     get_manager,
     get_processor_collection,
     get_processor_detail,
-    get_smbios_type1,
     get_storage_collection,
     get_storage_detail,
     get_virtual_media,
@@ -65,6 +64,7 @@ from .api.redfish_endpoints import (
     get_vm_status,
     get_volume_collection,
     parse_disk_size,
+    parse_smbios1,
 )
 from .api.virtual_media import manage_virtual_media
 from .auth.authentication import (
@@ -135,7 +135,6 @@ __all__ = [
     "get_processor_collection",
     "get_processor_detail",
     "get_proxmox_api",
-    "get_smbios_type1",
     "get_storage_collection",
     "get_storage_detail",
     "get_virtual_media",
@@ -150,6 +149,7 @@ __all__ = [
     "main",
     "manage_virtual_media",
     "parse_disk_size",
+    "parse_smbios1",
     "qualify_username",
     "power_off",
     "power_on",

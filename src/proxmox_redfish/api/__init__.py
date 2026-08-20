@@ -18,7 +18,6 @@ from .redfish_endpoints import (
     get_manager,
     get_processor_collection,
     get_processor_detail,
-    get_smbios_type1,
     get_storage_collection,
     get_storage_detail,
     get_virtual_media,
@@ -31,7 +30,6 @@ from .virtual_media import manage_virtual_media
 __all__ = [
     "get_vm_status",
     "get_bios",
-    "get_smbios_type1",
     "get_vm_config",
     "get_processor_collection",
     "get_processor_detail",
