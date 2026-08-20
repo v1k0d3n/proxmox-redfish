@@ -70,7 +70,6 @@ from .api.virtual_media import manage_virtual_media
 from .auth.authentication import (
     authenticate_user,
     extract_credentials,
-    get_credentials,
     qualify_username,
     sessions,
     validate_token,
@@ -128,7 +127,6 @@ __all__ = [
     "extract_credentials",
     "get_bios",
     "get_controller_collection",
-    "get_credentials",
     "get_drive_detail",
     "get_ethernet_interface_collection",
     "get_ethernet_interface_detail",
