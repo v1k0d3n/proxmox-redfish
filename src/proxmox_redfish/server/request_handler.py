@@ -263,7 +263,7 @@ class RedfishRequestHandler(BaseHTTPRequestHandler):
                         username += "@pam"
                     proxmox = ProxmoxAPI(PROXMOX_HOST, user=username, password=password, verify_ssl=VERIFY_SSL)
                     token = secrets.token_hex(16)
-                    sessions[token] = {"username": username, "password": password, "created": time.time()}
+                    sessions[token] = {"username": username, "created": time.time()}
                     status_code = 201
                     response = {
                         "@odata.id": f"/redfish/v1/SessionService/Sessions/{token}",

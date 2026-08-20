@@ -7,7 +7,6 @@ not do. See proxmox.client.get_proxmox_api.
 
 from .authentication import (
     authenticate_user,
-    get_credentials,
     validate_token,
 )
 
@@ -16,5 +15,4 @@ __all__ = [
     "authenticate_user",
     "extract_credentials",
     "qualify_username",
-    "get_credentials",
 ]

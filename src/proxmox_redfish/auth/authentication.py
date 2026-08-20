@@ -14,16 +14,12 @@ from ..config.settings import (
     VERIFY_SSL,
 )
 
-# In-memory session store
+# Sessions issued by SessionService, keyed by an opaque token.
+#
+# Records must never hold a credential. Anything that iterates or logs this
+# mapping would otherwise expose it, and entries here outlive the request
+# that created them.
 sessions: dict[str, dict[str, Any]] = {}
-
-
-def get_credentials(token: str) -> Tuple[str, str]:
-    """Get credentials for a given token."""
-    if token in sessions:
-        session = sessions[token]
-        return session["username"], session["password"]
-    raise Exception("No credentials found for token")
 
 
 def qualify_username(username: str) -> str:
@@ -123,8 +119,10 @@ def validate_token(headers: Any) -> Tuple[bool, str]:
                 username, password = credentials.split(":", 1)
                 username = qualify_username(username)
                 if authenticate_user(username, password):
-                    token = f"{username}-{password}"
-                    sessions[token] = {"created": time.time(), "username": username, "password": password}
+                    # Nothing is recorded here. Basic auth carries its own
+                    # credentials on every request and they are verified above,
+                    # so a stored copy buys nothing and would accumulate for the
+                    # life of the process.
                     return True, username
                 else:
                     return False, f"Invalid Basic Authentication credentials for user {username}"
