@@ -150,5 +150,46 @@ class AnUploadTaskThatFailsIsReportedTest(UploadTestCase):
         self.assertIn("copy failed", str(raised))
 
 
+class ARefusalArrivesAsARefusalTest(UploadTestCase):
+    """Proxmox answers 403 and closes the connection at once.
+
+    A client still streaming a real ISO sees that as a dropped socket
+    rather than as the 403 it is, so the privilege is asked about before
+    the body goes up. Proxmox still decides; this only settles what the
+    caller is told.
+    """
+
+    def _grant(self, allocate_template):
+        self.proxmox.access.permissions.get.return_value = {
+            "/storage/local": {"Datastore.AllocateTemplate": 1} if allocate_template else {}
+        }
+
+    def test_a_caller_without_the_privilege_is_told_so(self):
+        self._grant(False)
+        _, raised = self._run()
+        self.assertIsInstance(raised, ResourceException)
+        self.assertEqual(raised.status_code, 403)
+        self.assertIn("Datastore.AllocateTemplate", str(raised))
+
+    def test_nothing_is_sent_when_the_caller_is_refused(self):
+        self._grant(False)
+        self._run()
+        self.upload.post.assert_not_called()
+
+    def test_a_caller_with_the_privilege_uploads(self):
+        self._grant(True)
+        volid, raised = self._run()
+        self.assertIsNone(raised)
+        self.assertEqual(volid, "local:iso/test.iso")
+        self.upload.post.assert_called_once()
+
+    def test_an_unreadable_answer_leaves_it_to_the_upload(self):
+        """Not being able to ask is not the same as being refused."""
+        self.proxmox.access.permissions.get.side_effect = ResourceException(500, "Error", "boom")
+        volid, raised = self._run()
+        self.assertIsNone(raised)
+        self.upload.post.assert_called_once()
+
+
 if __name__ == "__main__":
     unittest.main()

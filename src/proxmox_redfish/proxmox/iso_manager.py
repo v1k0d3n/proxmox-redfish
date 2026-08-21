@@ -9,6 +9,7 @@ from typing import Dict, Optional
 
 import requests
 from proxmoxer import ProxmoxAPI
+from proxmoxer.core import ResourceException
 
 from ..config.logging_config import logger
 from ..config.settings import (
@@ -116,6 +117,27 @@ def _ensure_iso_available(proxmox: ProxmoxAPI, url_or_volid: str, node: str) -> 
         fetch.done.set()
 
 
+def _may_upload(proxmox: ProxmoxAPI, storage_name: str) -> Optional[bool]:
+    """Whether the caller holds Datastore.AllocateTemplate on a storage.
+
+    Returns ``None`` when the answer could not be obtained, which is left
+    for the upload itself to settle rather than guessed at.
+
+    Callers may read their own privileges without holding any, so this
+    costs nothing and reveals nothing they could not already see.
+    """
+    path = f"/storage/{storage_name}"
+    try:
+        granted = proxmox.access.permissions.get(path=path)
+    except Exception as exc:  # noqa: BLE001 - an unreadable answer is not an answer
+        logger.debug("Could not read privileges on %s: %s", path, exc)
+        return None
+
+    if not isinstance(granted, dict):
+        return None
+    return bool(granted.get(path, {}).get("Datastore.AllocateTemplate"))
+
+
 def _upload_iso(proxmox: ProxmoxAPI, node: str, path: str) -> None:
     """Upload a local file into the ISO storage as the calling user.
 
@@ -129,6 +151,18 @@ def _upload_iso(proxmox: ProxmoxAPI, node: str, path: str) -> None:
     back as an empty "400 Bad Request", which is why the stored image is
     named after the file on disk rather than by a field of its own.
     """
+    # Proxmox is the one that decides this, and it is asked again below by
+    # the upload itself. The question is put first only so that a refusal
+    # arrives as a refusal: Proxmox answers 403 and closes the connection
+    # at once, which a client still streaming a real ISO sees as a dropped
+    # socket rather than as the 403 it is.
+    if _may_upload(proxmox, PROXMOX_ISO_STORAGE) is False:
+        raise ResourceException(
+            403,
+            "Forbidden",
+            f"Permission check failed (/storage/{PROXMOX_ISO_STORAGE}, Datastore.AllocateTemplate)",
+        )
+
     fname = os.path.basename(path)
     logger.info("Uploading %s to storage %s", fname, PROXMOX_ISO_STORAGE)
 
