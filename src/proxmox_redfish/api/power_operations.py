@@ -7,23 +7,25 @@ from proxmoxer import ProxmoxAPI
 from ..config.logging_config import logger
 from ..proxmox.placement import vm
 from ..utils.error_handling import handle_proxmox_error
+from ..utils.vm_locks import settled_media
 
 
 def power_on(proxmox: ProxmoxAPI, vm_id: int) -> Tuple[Dict[str, Any], int]:
     """Power on a VM."""
     logger.info("Power On request for VM %s", vm_id)
     try:
-        task = vm(proxmox, vm_id).status.start.post()
-        logger.info("Power On initiated for VM %s, task: %s", vm_id, task)
-        return {
-            "@odata.id": f"/redfish/v1/TaskService/Tasks/{task}",
-            "@odata.type": "#Task.v1_0_0.Task",
-            "Id": task,
-            "Name": f"Power On VM {vm_id}",
-            "TaskState": "Running",
-            "TaskStatus": "OK",
-            "Messages": [{"Message": f"Power On request initiated for VM {vm_id}"}],
-        }, 202
+        with settled_media(vm_id, "Power On"):
+            task = vm(proxmox, vm_id).status.start.post()
+            logger.info("Power On initiated for VM %s, task: %s", vm_id, task)
+            return {
+                "@odata.id": f"/redfish/v1/TaskService/Tasks/{task}",
+                "@odata.type": "#Task.v1_0_0.Task",
+                "Id": task,
+                "Name": f"Power On VM {vm_id}",
+                "TaskState": "Running",
+                "TaskStatus": "OK",
+                "Messages": [{"Message": f"Power On request initiated for VM {vm_id}"}],
+            }, 202
     except Exception as e:
         logger.error("Power On failed for VM %s: %s", vm_id, str(e), exc_info=True)
         return handle_proxmox_error("Power On", e, vm_id)
@@ -49,16 +51,17 @@ def power_off(proxmox: ProxmoxAPI, vm_id: int) -> Tuple[Dict[str, Any], int]:
 def reboot(proxmox: ProxmoxAPI, vm_id: int) -> Tuple[Dict[str, Any], int]:
     """Reboot a VM gracefully."""
     try:
-        task = vm(proxmox, vm_id).status.reboot.post()
-        return {
-            "@odata.id": f"/redfish/v1/TaskService/Tasks/{task}",
-            "@odata.type": "#Task.v1_0_0.Task",
-            "Id": task,
-            "Name": f"Reboot VM {vm_id}",
-            "TaskState": "Running",
-            "TaskStatus": "OK",
-            "Messages": [{"Message": f"Reboot request initiated for VM {vm_id}"}],
-        }, 202
+        with settled_media(vm_id, "Reboot"):
+            task = vm(proxmox, vm_id).status.reboot.post()
+            return {
+                "@odata.id": f"/redfish/v1/TaskService/Tasks/{task}",
+                "@odata.type": "#Task.v1_0_0.Task",
+                "Id": task,
+                "Name": f"Reboot VM {vm_id}",
+                "TaskState": "Running",
+                "TaskStatus": "OK",
+                "Messages": [{"Message": f"Reboot request initiated for VM {vm_id}"}],
+            }, 202
     except Exception as e:
         return handle_proxmox_error("Reboot", e, vm_id)
 
@@ -75,16 +78,17 @@ def reset_vm(proxmox: ProxmoxAPI, vm_id: int) -> Tuple[Dict[str, Any], int]:
         Tuple of (response_dict, status_code) for Redfish response
     """
     try:
-        task = vm(proxmox, vm_id).status.reset.post()
-        return {
-            "@odata.id": f"/redfish/v1/TaskService/Tasks/{task}",
-            "@odata.type": "#Task.v1_0_0.Task",
-            "Id": task,
-            "Name": f"Hard Reset VM {vm_id}",
-            "TaskState": "Running",
-            "TaskStatus": "OK",
-            "Messages": [{"Message": f"Hard reset request initiated for VM {vm_id}"}],
-        }, 202
+        with settled_media(vm_id, "Hard Reset"):
+            task = vm(proxmox, vm_id).status.reset.post()
+            return {
+                "@odata.id": f"/redfish/v1/TaskService/Tasks/{task}",
+                "@odata.type": "#Task.v1_0_0.Task",
+                "Id": task,
+                "Name": f"Hard Reset VM {vm_id}",
+                "TaskState": "Running",
+                "TaskStatus": "OK",
+                "Messages": [{"Message": f"Hard reset request initiated for VM {vm_id}"}],
+            }, 202
     except Exception as e:
         return handle_proxmox_error("Hard Reset", e, vm_id)
 
@@ -109,16 +113,17 @@ def suspend_vm(proxmox: ProxmoxAPI, vm_id: int) -> Tuple[Dict[str, Any], int]:
 def resume_vm(proxmox: ProxmoxAPI, vm_id: int) -> Tuple[Dict[str, Any], int]:
     """Resume a suspended VM."""
     try:
-        task = vm(proxmox, vm_id).status.resume.post()
-        return {
-            "@odata.id": f"/redfish/v1/TaskService/Tasks/{task}",
-            "@odata.type": "#Task.v1_0_0.Task",
-            "Id": task,
-            "Name": f"Resume VM {vm_id}",
-            "TaskState": "Running",
-            "TaskStatus": "OK",
-            "Messages": [{"Message": f"Resume request initiated for VM {vm_id}"}],
-        }, 202
+        with settled_media(vm_id, "Resume"):
+            task = vm(proxmox, vm_id).status.resume.post()
+            return {
+                "@odata.id": f"/redfish/v1/TaskService/Tasks/{task}",
+                "@odata.type": "#Task.v1_0_0.Task",
+                "Id": task,
+                "Name": f"Resume VM {vm_id}",
+                "TaskState": "Running",
+                "TaskStatus": "OK",
+                "Messages": [{"Message": f"Resume request initiated for VM {vm_id}"}],
+            }, 202
     except Exception as e:
         return handle_proxmox_error("Resume", e, vm_id)
 
