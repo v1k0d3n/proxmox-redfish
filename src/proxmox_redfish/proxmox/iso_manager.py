@@ -17,7 +17,6 @@ from ..config.settings import (
     VERIFY_SSL,
 )
 from ..utils.file_operations import (
-    atomic_file_write,
     get_file_lock,
     safe_file_hash,
 )
@@ -116,6 +115,71 @@ def _ensure_iso_available(proxmox: ProxmoxAPI, url_or_volid: str, node: str) -> 
         with _inflight_lock:
             _inflight.pop(url_or_volid, None)
         fetch.done.set()
+
+
+def _may_upload(proxmox: ProxmoxAPI, storage_name: str) -> Optional[bool]:
+    """Whether the caller holds Datastore.AllocateTemplate on a storage.
+
+    Returns ``None`` when the answer could not be obtained, which is left
+    for the upload itself to settle rather than guessed at.
+
+    Callers may read their own privileges without holding any, so this
+    costs nothing and reveals nothing they could not already see.
+    """
+    path = f"/storage/{storage_name}"
+    try:
+        granted = proxmox.access.permissions.get(path=path)
+    except Exception as exc:  # noqa: BLE001 - an unreadable answer is not an answer
+        logger.debug("Could not read privileges on %s: %s", path, exc)
+        return None
+
+    if not isinstance(granted, dict):
+        return None
+    return bool(granted.get(path, {}).get("Datastore.AllocateTemplate"))
+
+
+def _upload_iso(proxmox: ProxmoxAPI, node: str, path: str) -> None:
+    """Upload a local file into the ISO storage as the calling user.
+
+    The image goes up over the caller's own API connection, so Proxmox is
+    the one deciding whether this caller may write to this storage. A
+    refusal propagates: there is no second route to the storage, so a
+    caller Proxmox turns away is turned away.
+
+    Proxmox wants the image itself in the field named ``filename``.
+    Sending it as ``file`` beside a separate ``filename`` string comes
+    back as an empty "400 Bad Request", which is why the stored image is
+    named after the file on disk rather than by a field of its own.
+    """
+    # Proxmox is the one that decides this, and it is asked again below by
+    # the upload itself. The question is put first only so that a refusal
+    # arrives as a refusal: Proxmox answers 403 and closes the connection
+    # at once, which a client still streaming a real ISO sees as a dropped
+    # socket rather than as the 403 it is.
+    if _may_upload(proxmox, PROXMOX_ISO_STORAGE) is False:
+        raise ResourceException(
+            403,
+            "Forbidden",
+            f"Permission check failed (/storage/{PROXMOX_ISO_STORAGE}, Datastore.AllocateTemplate)",
+        )
+
+    fname = os.path.basename(path)
+    logger.info("Uploading %s to storage %s", fname, PROXMOX_ISO_STORAGE)
+
+    with open(path, "rb") as image:
+        task = proxmox.nodes(node).storage(PROXMOX_ISO_STORAGE).upload.post(content="iso", filename=image)
+
+    logger.info("Upload task started: %s", task)
+    while True:
+        status = proxmox.nodes(node).tasks(task).status.get()
+        if status is None:
+            raise Exception("Failed to get task status")
+        if status.get("status") == "stopped":
+            if status.get("exitstatus") == "OK":
+                logger.info("Upload of %s completed", fname)
+                return
+            raise Exception(f"Upload of {fname} failed: {status}")
+        time.sleep(2)
 
 
 def _fetch_iso(proxmox: ProxmoxAPI, url_or_volid: str, node: str) -> str:
@@ -223,73 +287,16 @@ def _fetch_iso(proxmox: ProxmoxAPI, url_or_volid: str, node: str) -> str:
                 resp = requests.get(url_or_volid, stream=True, timeout=(30, 1800), verify=VERIFY_SSL)
                 resp.raise_for_status()
 
-                with tempfile.NamedTemporaryFile() as tmp:
-                    for chunk in resp.iter_content(16 << 20):  # 16 MiB chunks
-                        tmp.write(chunk)
-                    tmp.flush()
+                # Proxmox names the stored image after the file it is handed,
+                # so the download lands in a scratch directory under the name
+                # it should keep rather than under a random temporary one.
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    tmp_path = os.path.join(tmpdir, fname)
+                    with open(tmp_path, "wb") as tmp:
+                        for chunk in resp.iter_content(16 << 20):  # 16 MiB chunks
+                            tmp.write(chunk)
 
-                    # Try API upload first, fallback to direct file copy if it fails
-                    try:
-                        logger.info("Attempting API upload to storage %s", PROXMOX_ISO_STORAGE)
-                        upload = proxmox.nodes(node).storage(PROXMOX_ISO_STORAGE).upload
-                        task = upload.post(content="iso", filename=fname, file=open(tmp.name, "rb"))
-
-                        # Wait for the upload task to finish
-                        logger.info("API upload task started: %s", task)
-                        while True:
-                            status = proxmox.nodes(node).tasks(task).status.get()
-                            if status is None:
-                                raise Exception("Failed to get task status")
-                            if status.get("status") == "stopped":
-                                if status.get("exitstatus") == "OK":
-                                    logger.info("API upload completed successfully")
-                                    break
-                                else:
-                                    raise Exception(f"API upload failed: {status}")
-                            time.sleep(2)
-
-                    except Exception as api_error:
-                        # Refusals are never worked around. The upload is where
-                        # Proxmox checks whether the caller may write to this
-                        # storage, so falling back past a 401 or 403 would carry
-                        # out exactly the operation that was just denied.
-                        if isinstance(api_error, ResourceException) and api_error.status_code in (401, 403):
-                            logger.warning(
-                                "Upload of %s refused (HTTP %s); not writing it directly",
-                                fname,
-                                api_error.status_code,
-                            )
-                            raise
-
-                        # Anything else falls back to writing the file into the
-                        # storage directory. That is not a nicety: the upload API
-                        # rejects this request outright on at least some Proxmox
-                        # installations -- a one kilobyte file comes back "400 Bad
-                        # Request" with an empty error body, on both proxmoxer
-                        # 2.2 and 2.3 -- so without this, virtual media does not
-                        # work there at all.
-                        #
-                        # The write runs as the daemon's OS user, so it is
-                        # deliberately placed after the permission check above: a
-                        # caller Proxmox refuses is refused here too, and only a
-                        # caller it accepted reaches this path.
-                        logger.warning(
-                            "Upload of %s failed (%s); writing it to the storage directory instead",
-                            fname,
-                            api_error,
-                        )
-
-                        try:
-                            logger.info("Copying ISO to: %s", iso_path)
-                            os.makedirs(os.path.dirname(iso_path), exist_ok=True)
-                            atomic_file_write(tmp.name, iso_path)
-                            logger.info("Direct file copy completed successfully")
-
-                        except Exception as copy_error:
-                            raise Exception(
-                                f"Both API upload and direct copy failed. "
-                                f"API error: {api_error}, Copy error: {copy_error}"
-                            )
+                    _upload_iso(proxmox, node, tmp_path)
 
             volid = f"{PROXMOX_ISO_STORAGE}:iso/{fname}"
             logger.info("ISO available as: %s", volid)
