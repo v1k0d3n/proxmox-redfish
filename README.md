@@ -69,22 +69,60 @@ This guide will take you from a fresh Proxmox installation to a fully working Re
    apt install -y git openssl curl
    ```
 
-5. Download and Install the Redfish Daemon
+5. Install the daemon
+
+   The installer creates a virtual environment, installs the package into it,
+   generates a self-signed certificate, writes a configuration template and a
+   systemd unit, and stops there. Nothing starts until you have filled in the
+   configuration.
 
    ```bash
-   # Clone the repository
-   git clone https://github.com/v1k0d3n/proxmox-redfish.git /opt/proxmox-redfish
-
-   # Create a virtual environment
-   cd /opt/proxmox-redfish
-   python3 -m venv venv
-
-   # Activate the virtual environment
-   source venv/bin/activate
-
-   # Install the package
-   pip install -e .
+   git clone https://github.com/v1k0d3n/proxmox-redfish.git /tmp/proxmox-redfish
+   /tmp/proxmox-redfish/scripts/install.sh
    ```
+
+   To install a particular release rather than the default branch:
+
+   ```bash
+   /tmp/proxmox-redfish/scripts/install.sh --version v0.1.0
+   ```
+
+   Useful options: `--install-dir` to install elsewhere, `--skip-service` to
+   install the package without touching systemd, `--yes` to answer prompts.
+
+   A virtual environment is not optional. Proxmox does not carry `proxmoxer`
+   or `requests` system-wide, and installing them into the system Python with
+   pip is not safe on a Debian host.
+
+   <details>
+   <summary>Installing by hand instead</summary>
+
+   ```bash
+   mkdir -p /opt/proxmox-redfish/config/ssl
+   python3 -m venv /opt/proxmox-redfish/venv
+   /opt/proxmox-redfish/venv/bin/pip install \
+     git+https://github.com/v1k0d3n/proxmox-redfish.git
+   ```
+
+   That gives you `/opt/proxmox-redfish/venv/bin/proxmox-redfish`. The
+   certificate, `config/params.env` and the systemd unit are then yours to
+   create; the steps below show what the installer would have written.
+   </details>
+
+   > **Replacing an earlier version.** This release is structured differently
+   > from anything before `v0.1.0` -- the daemon was a single script and is now
+   > an installed package. There is no in-place upgrade. Back up the old
+   > directory and its unit file, then install fresh:
+   >
+   > ```bash
+   > tar czf /root/proxmox-redfish-backup.tgz -C /opt proxmox-redfish
+   > cp /etc/systemd/system/proxmox-redfish.service /root/
+   > ```
+   >
+   > Read "Upgrading from a release before caller identity" in the
+   > [Administrators Guide](./docs/admins/README.md#proxmox-permissions) first.
+   > Requests are now served using the calling account's own Proxmox
+   > credentials, so those accounts need privileges before they will work.
 
 6. Optional (recommended): Generate basic SSL certificates - these can be valid certs, if you want to generate them a different way (below is primarily a working example)
 
@@ -137,7 +175,10 @@ This guide will take you from a fresh Proxmox installation to a fully working Re
    ```
    **Important**: Replace `your-proxmox-root-password` with your actual Proxmox root password.
 
-7. Create a systemd service unit (so we can run the proxmox-redfish daemon as a service)
+8. Create a systemd service unit, if you installed by hand
+
+   The installer writes this for you. The port comes from `REDFISH_PORT` in
+   `params.env`, so it is not repeated here.
 
    ```bash
    # Create the systemd service file
@@ -152,7 +193,7 @@ This guide will take you from a fresh Proxmox installation to a fully working Re
    Group=root
    WorkingDirectory=/opt/proxmox-redfish
    EnvironmentFile=/opt/proxmox-redfish/config/params.env
-   ExecStart=/opt/proxmox-redfish/venv/bin/python /opt/proxmox-redfish/src/proxmox_redfish/proxmox_redfish.py --port 8000
+   ExecStart=/opt/proxmox-redfish/venv/bin/proxmox-redfish
    Restart=always
    RestartSec=10
 
@@ -168,7 +209,7 @@ This guide will take you from a fresh Proxmox installation to a fully working Re
    systemctl enable proxmox-redfish.service --now
    ```
 
-8. Start the service
+9. Start the service
 
    ```bash
    # Start the service
@@ -181,9 +222,12 @@ This guide will take you from a fresh Proxmox installation to a fully working Re
    journalctl -u proxmox-redfish -f
    ```
 
-### Using a Least-Privilege Service Account
+### Creating a Least-Privilege Redfish Account
 
-For production use, create a dedicated user instead of using root:
+The daemon holds no Proxmox account of its own. Every request is performed
+using the credentials of the caller, so what a caller can do is decided by
+their Proxmox permissions. Create an account for whatever will drive the
+daemon, and grant it only what it needs:
 
 1. In the Proxmox web interface
    - Go to "Datacenter" → **Users**

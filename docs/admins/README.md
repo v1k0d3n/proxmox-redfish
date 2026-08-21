@@ -51,26 +51,28 @@ Create a configuration file for easier management:
 # Create configuration directory
 mkdir -p /opt/proxmox-redfish/config
 
-# Create configuration file
+# Create configuration file. systemd reads this as an EnvironmentFile, which
+# accepts plain NAME=value lines only -- an "export" prefix is rejected and
+# the setting silently does not reach the daemon.
 cat > /opt/proxmox-redfish/config/params.env << 'EOF'
 # Proxmox Configuration
-export PROXMOX_HOST="192.168.1.100"
-export PROXMOX_NODE="pve"
-export PROXMOX_ISO_STORAGE="local"
-export VERIFY_SSL="false"
+PROXMOX_HOST="192.168.1.100"
+PROXMOX_NODE="pve"
+PROXMOX_ISO_STORAGE="local"
+VERIFY_SSL="false"
 
 # Redfish Configuration
-export REDFISH_PORT="8443"
-export REDFISH_HOST="0.0.0.0"
+REDFISH_PORT="8443"
+REDFISH_HOST="0.0.0.0"
 
 # SSL Configuration
-export SSL_CERT_FILE="/opt/proxmox-redfish/config/ssl/server.crt"
-export SSL_KEY_FILE="/opt/proxmox-redfish/config/ssl/server.key"
-export SSL_CA_FILE="/opt/proxmox-redfish/config/ssl/ca.crt"
+SSL_CERT_FILE="/opt/proxmox-redfish/config/ssl/server.crt"
+SSL_KEY_FILE="/opt/proxmox-redfish/config/ssl/server.key"
+SSL_CA_FILE="/opt/proxmox-redfish/config/ssl/ca.crt"
 
 # Logging Configuration
-export REDFISH_LOG_LEVEL="INFO"
-export REDFISH_LOGGING_ENABLED="true"
+REDFISH_LOG_LEVEL="INFO"
+REDFISH_LOGGING_ENABLED="true"
 EOF
 ```
 
@@ -141,8 +143,8 @@ that node and ignores anything else. This is the default arrangement and the
 one most deployments use.
 
 ```bash
-export PROXMOX_HOST="proxmox.example.com"
-export PROXMOX_NODE="pve"
+PROXMOX_HOST=proxmox.example.com
+PROXMOX_NODE=pve
 ```
 
 ### Cluster (experimental)
@@ -152,7 +154,7 @@ running, so a guest that migrates keeps working without a configuration
 change, and every node's guests are reachable through one endpoint.
 
 ```bash
-export PROXMOX_HOST="proxmox.example.com"
+PROXMOX_HOST=proxmox.example.com
 # PROXMOX_NODE deliberately unset
 ```
 
