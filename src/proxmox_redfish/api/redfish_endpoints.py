@@ -37,17 +37,17 @@ def get_vm_status(proxmox: ProxmoxAPI, vm_id: int) -> Union[Dict[str, Any], Tupl
             power_state = "Unknown"
             health = "Critical"
 
-        # Add Memory field as expected by tests
+        # How much memory the guest is configured with. This belongs in
+        # MemorySummary: Memory is a link to a collection of modules and
+        # carries no properties of its own, and a client reading a total
+        # reads it from the summary. There is no collection of modules to
+        # link to, so none is offered rather than offered and unanswered.
         memory_mb = config.get("memory", 0)
         try:
             memory_mb = float(memory_mb)
         except (ValueError, TypeError):
             memory_mb = 0
-        memory_gib = memory_mb / 1024.0
-        memory_field = {
-            "@odata.id": f"/redfish/v1/Systems/{vm_id}/Memory",
-            "TotalSystemMemoryGiB": round(memory_gib, 2),
-        }
+        memory_summary = {"TotalSystemMemoryGiB": round(memory_mb / 1024.0, 2)}
 
         # Add Boot field as expected by tests
         boot_order = config.get("boot", "")
@@ -86,7 +86,7 @@ def get_vm_status(proxmox: ProxmoxAPI, vm_id: int) -> Union[Dict[str, Any], Tupl
             "PowerState": power_state,
             "Bios": {"@odata.id": f"/redfish/v1/Systems/{vm_id}/Bios"},
             "Processors": {"@odata.id": f"/redfish/v1/Systems/{vm_id}/Processors"},
-            "Memory": memory_field,
+            "MemorySummary": memory_summary,
             "Storage": {"@odata.id": f"/redfish/v1/Systems/{vm_id}/Storage"},
             "EthernetInterfaces": {"@odata.id": f"/redfish/v1/Systems/{vm_id}/EthernetInterfaces"},
             "Boot": boot_field,

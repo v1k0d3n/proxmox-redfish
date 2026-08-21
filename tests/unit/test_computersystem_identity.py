@@ -83,7 +83,7 @@ class ComputerSystemResourceTest(unittest.TestCase):
 
     def test_existing_properties_are_untouched(self):
         system = self._system(f"uuid={UUID}")
-        for expected in ("@odata.id", "Id", "Name", "PowerState", "Boot", "Actions", "Memory", "Status"):
+        for expected in ("@odata.id", "Id", "Name", "PowerState", "Boot", "Actions", "MemorySummary", "Status"):
             self.assertIn(expected, system)
 
 
@@ -104,3 +104,30 @@ class RemovedEndpointTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class MemoryIsReportedWhereItIsReadTest(unittest.TestCase):
+    """Memory is a link to a collection of modules, not a place for totals.
+
+    The daemon has no collection of modules to offer, so it offers none
+    rather than offering a link that does not answer, and reports the total
+    it does know from MemorySummary, which is where a client reads one.
+    """
+
+    def _system(self, extra_config=""):
+        return ComputerSystemResourceTest._system(self, extra_config)
+
+    def test_the_total_is_in_the_summary(self):
+        system = self._system()
+        self.assertIn("MemorySummary", system)
+        self.assertIn("TotalSystemMemoryGiB", system["MemorySummary"])
+
+    def test_no_memory_link_is_offered(self):
+        """Nothing serves /Systems/{id}/Memory, so nothing points at it."""
+        self.assertNotIn("Memory", self._system())
+
+    def test_every_link_it_does_offer_is_served(self):
+        """The other collections all answer, and are named as links."""
+        system = self._system()
+        for served in ("Bios", "Processors", "Storage", "EthernetInterfaces"):
+            self.assertIn("@odata.id", system[served])

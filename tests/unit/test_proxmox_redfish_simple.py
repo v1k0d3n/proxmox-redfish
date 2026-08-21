@@ -268,7 +268,7 @@ class TestRedfishProxmox(unittest.TestCase):
 
         # Verify required Redfish fields
         self.assertIn("Processors", response)
-        self.assertIn("Memory", response)
+        self.assertIn("MemorySummary", response)
         self.assertIn("Storage", response)
         self.assertIn("EthernetInterfaces", response)
         self.assertIn("Boot", response)

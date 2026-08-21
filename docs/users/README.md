@@ -94,11 +94,23 @@ curl -k -u "${REDFISH_USER}:${REDFISH_PASS}" \
   "@odata.type": "#ServiceRoot.v1_0_0.ServiceRoot",
   "Id": "RootService",
   "Name": "Root Service",
+  "RedfishVersion": "1.0.0",
   "Systems": {
     "@odata.id": "/redfish/v1/Systems"
   },
   "Managers": {
     "@odata.id": "/redfish/v1/Managers"
+  },
+  "TaskService": {
+    "@odata.id": "/redfish/v1/TaskService"
+  },
+  "SessionService": {
+    "@odata.id": "/redfish/v1/SessionService"
+  },
+  "Links": {
+    "Sessions": {
+      "@odata.id": "/redfish/v1/SessionService/Sessions"
+    }
   }
 }
 ```
@@ -152,8 +164,7 @@ curl -k -u "${REDFISH_USER}:${REDFISH_PASS}" \
     "Health": "OK"
   },
   "PowerState": "On",
-  "Memory": {
-    "@odata.id": "/redfish/v1/Systems/100/Memory",
+  "MemorySummary": {
     "TotalSystemMemoryGiB": 2.0
   },
   "Boot": {
@@ -231,15 +242,16 @@ curl -k -X POST -u "${REDFISH_USER}:${REDFISH_PASS}" \
 
 ### Get Virtual Media Status
 
-```bash
-# Method 1: Systems endpoint (Metal3/Ironic style)
-curl -k -u "${REDFISH_USER}:${REDFISH_PASS}" \
-  "${REDFISH_BASEURL}/redfish/v1/Systems/${REDFISH_VMID}/VirtualMedia/Cd" | jq
+The virtual media resource is read from the manager, which is where a
+system's `Links.ManagedBy` points:
 
-# Method 2: Managers endpoint (Sushy default style)
+```bash
 curl -k -u "${REDFISH_USER}:${REDFISH_PASS}" \
   "${REDFISH_BASEURL}/redfish/v1/Managers/${REDFISH_VMID}/VirtualMedia/Cd" | jq
 ```
+
+Inserting and ejecting can also be addressed under the system, as shown
+below; only the readable resource lives under the manager.
 
 **Response:**
 ```json
@@ -373,9 +385,12 @@ curl -k -X PATCH -u "${REDFISH_USER}:${REDFISH_PASS}" \
 
 ### Get Memory Information
 
+Memory is reported by the system resource itself, under `MemorySummary`.
+There is no memory collection to list.
+
 ```bash
 curl -k -u "${REDFISH_USER}:${REDFISH_PASS}" \
-  "${REDFISH_BASEURL}/redfish/v1/Systems/${REDFISH_VMID}/Memory" | jq
+  "${REDFISH_BASEURL}/redfish/v1/Systems/${REDFISH_VMID}" | jq .MemorySummary
 ```
 
 ### Get Storage Information
@@ -462,6 +477,31 @@ curl -k -X POST -u "${REDFISH_USER}:${REDFISH_PASS}" \
   -d "{\"Image\": \"${REDFISH_ISOURL}\"}" \
   "${REDFISH_BASEURL}/redfish/v1/Systems/${REDFISH_VMID}/VirtualMedia/CDROM/Actions/VirtualMedia.InsertMedia"
 ```
+
+## Tracking Tasks
+
+Power actions and virtual media actions answer with a Task. Its `Id` is the
+Proxmox task behind the operation, and `@odata.id` is a URI you can read.
+
+```bash
+curl -k -u "${REDFISH_USER}:${REDFISH_PASS}" \
+  "${REDFISH_BASEURL}/redfish/v1/TaskService/Tasks/${TASK_ID}" | jq
+```
+
+`TaskState` is `Completed` when the daemon finished the work before replying,
+which is the case for virtual media: the image is fetched, uploaded and
+attached before the response is written. Power actions report `Running`,
+because Proxmox carries them out after accepting them.
+
+List everything currently running:
+
+```bash
+curl -k -u "${REDFISH_USER}:${REDFISH_PASS}" \
+  "${REDFISH_BASEURL}/redfish/v1/TaskService/Tasks" | jq
+```
+
+A task URI contains colons. Quote it, and percent-encode it if your client
+does not.
 
 ## Error Handling
 
