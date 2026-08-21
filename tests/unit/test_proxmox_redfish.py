@@ -276,9 +276,11 @@ class TestRedfishProxmox(unittest.TestCase):
 
         response, status_code = manage_virtual_media(mock_proxmox, self.test_vm_id, "InsertMedia", iso_path)
 
-        self.assertEqual(status_code, 202)
+        # The insert finishes before the response is written, so the task is
+        # reported Completed rather than Running.
+        self.assertEqual(status_code, 200)
         self.assertIn("@odata.id", response)
-        self.assertEqual(response["TaskState"], "Running")
+        self.assertEqual(response["TaskState"], "Completed")
         self.assertIn("Insert Media", response["Name"])
 
         # Verify Proxmox API was called
@@ -287,12 +289,15 @@ class TestRedfishProxmox(unittest.TestCase):
     def test_manage_virtual_media_eject_success(self):
         """Test successful virtual media eject operation"""
         mock_proxmox = self.create_mock_proxmox()
+        # Eject is a no-op when the drive is already empty, so give it media.
+        attached = dict(self.mock_vm_config, ide2="local:iso/test.iso,media=cdrom")
+        mock_proxmox.nodes.return_value.qemu.return_value.config.get.return_value = attached
 
         response, status_code = manage_virtual_media(mock_proxmox, self.test_vm_id, "EjectMedia")
 
-        self.assertEqual(status_code, 202)
+        self.assertEqual(status_code, 200)
         self.assertIn("@odata.id", response)
-        self.assertEqual(response["TaskState"], "Running")
+        self.assertEqual(response["TaskState"], "Completed")
         self.assertIn("Eject Media", response["Name"])
 
         # Verify Proxmox API was called
