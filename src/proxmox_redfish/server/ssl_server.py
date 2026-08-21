@@ -9,13 +9,29 @@ from ..config.settings import SSL_CA_FILE, SSL_CERT_FILE, SSL_KEY_FILE
 from .request_handler import RedfishRequestHandler
 
 
+class _ThreadedServer(socketserver.ThreadingTCPServer):
+    """Serve each request on its own thread.
+
+    A single-threaded server answers one request at a time, so a virtual
+    media transfer holds every other caller -- including one polling the
+    task it was just handed -- for as long as the image takes to fetch.
+
+    daemon_threads lets the process exit without waiting for a transfer in
+    progress; allow_reuse_address avoids a restart failing while the old
+    socket is still in TIME_WAIT.
+    """
+
+    daemon_threads = True
+    allow_reuse_address = True
+
+
 def run_server_ssl(port: int = 443, host: str = "") -> None:
     """Run the SSL server on the specified port.
 
     An empty host binds every interface, which is the historical behaviour.
     """
     server_address = (host, port)
-    httpd = socketserver.TCPServer(server_address, RedfishRequestHandler)
+    httpd = _ThreadedServer(server_address, RedfishRequestHandler)
 
     # Wrap the socket with SSL
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
