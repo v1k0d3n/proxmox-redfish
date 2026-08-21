@@ -1,28 +1,24 @@
+# Example systemd unit. scripts/install.sh writes this for you, with the
+# paths it installed to; this copy is for a hand-built installation.
+#
+# Configuration lives in the EnvironmentFile rather than in Environment=
+# lines here: `systemctl show` prints unit settings to any local user, and a
+# separate file can be mode 600. See config/params.env.example.
+
 [Unit]
-Description=Proxmox-Redfish Daemon for Proxmox VM Control
-After=network.target
+Description=Proxmox Redfish Daemon
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=simple
 User=root
 Group=root
-Environment="PROXMOX_HOST=192.168.1.55"
-# The daemon serves each request as the Redfish caller, so it needs no
-# Proxmox account of its own. PROXMOX_USER and PROXMOX_PASSWORD are no
-# longer read; grant privileges to the calling accounts instead. See
-# "Proxmox Permissions" in docs/admins.
-# Restrict the daemon to one node. Omit to manage a whole cluster
-# (experimental); see "Single Node and Clusters" in the admin guide.
-Environment="PROXMOX_NODE=pve"
-Environment="REDFISH_LOGGING_ENABLED=True"
-Environment="REDFISH_LOG_LEVEL=INFO"
-Environment="PROXMOX_ISO_STORAGE=local"
-Environment="SSL_CERT_FILE=/opt/proxmox-redfish/config/ssl/server.crt"
-Environment="SSL_KEY_FILE=/opt/proxmox-redfish/config/ssl/server.key"
-ExecStart=/opt/proxmox-redfish/venv/bin/python /opt/proxmox-redfish/src/proxmox_redfish/proxmox_redfish.py --port 8000
+EnvironmentFile=/opt/proxmox-redfish/config/params.env
+ExecStart=/opt/proxmox-redfish/venv/bin/proxmox-redfish
 WorkingDirectory=/opt/proxmox-redfish
 Restart=always
-Type=simple
+RestartSec=10
 
 [Install]
 WantedBy=multi-user.target
