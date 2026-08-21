@@ -6,6 +6,7 @@ import secrets
 import time
 from http.server import BaseHTTPRequestHandler
 from typing import Any, Dict, Tuple, Union
+from urllib.parse import unquote
 
 from proxmoxer import ProxmoxAPI
 
@@ -33,6 +34,7 @@ from ..api.redfish_endpoints import (
     get_vm_status,
     get_volume_collection,
 )
+from ..api.task_service import get_task, get_task_collection, get_task_service
 from ..api.virtual_media import manage_virtual_media
 from ..auth.authentication import sessions, validate_token
 from ..config.logging_config import logger
@@ -68,6 +70,7 @@ class RedfishRequestHandler(BaseHTTPRequestHandler):
                 "Name": "Redfish Root Service",
                 "RedfishVersion": "1.0.0",
                 "Systems": {"@odata.id": "/redfish/v1/Systems"},
+                "TaskService": {"@odata.id": "/redfish/v1/TaskService"},
             }
         else:
             # Require authentication for all other endpoints
@@ -78,7 +81,14 @@ class RedfishRequestHandler(BaseHTTPRequestHandler):
             else:
                 proxmox = get_proxmox_api(self.headers)
                 parts = path.split("/")
-                if path == "/redfish/v1/Systems":
+                if path == "/redfish/v1/TaskService":
+                    response = get_task_service()
+                elif path == "/redfish/v1/TaskService/Tasks":
+                    response = get_task_collection(proxmox)
+                elif path.startswith("/redfish/v1/TaskService/Tasks/"):
+                    upid = path[len("/redfish/v1/TaskService/Tasks/") :]
+                    response = get_task(proxmox, unquote(upid))
+                elif path == "/redfish/v1/Systems":
                     try:
                         members = [{"@odata.id": f"/redfish/v1/Systems/{vm_id}"} for vm_id in list_vm_ids(proxmox)]
                         response = {
