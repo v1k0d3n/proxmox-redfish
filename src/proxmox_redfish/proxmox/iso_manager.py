@@ -3,7 +3,9 @@
 import hashlib
 import os
 import tempfile
+import threading
 import time
+from typing import Dict, Optional
 
 import requests
 from proxmoxer import ProxmoxAPI
@@ -58,7 +60,65 @@ def iso_directory(proxmox: ProxmoxAPI, storage_name: str) -> str:
     raise ValueError(f"Storage {storage_name} was not found, or the caller may not see it")
 
 
+class _Fetch:
+    """A transfer one caller is performing on behalf of any others waiting."""
+
+    def __init__(self) -> None:
+        self.done = threading.Event()
+        self.volid: Optional[str] = None
+        self.error: Optional[BaseException] = None
+
+
+_inflight: Dict[str, _Fetch] = {}
+_inflight_lock = threading.Lock()
+
+
 def _ensure_iso_available(proxmox: ProxmoxAPI, url_or_volid: str, node: str) -> str:
+    """Return a storage volid for an image, fetching it once however many ask.
+
+    Provisioning a cluster points several machines at the same image at the
+    same time. Each request would otherwise download it in full -- the image
+    already being present does not help, since it is downloaded again to hash
+    it -- so a six node cluster means six transfers of the same file.
+
+    Callers arriving while a transfer is running wait for it and use its
+    result. Nothing is cached beyond that: a later request starts a fresh
+    transfer, because the same URL can serve a different image over time.
+    """
+    # A volid already names an image on storage; there is nothing to fetch.
+    if ":iso/" in url_or_volid:
+        return _fetch_iso(proxmox, url_or_volid, node)
+
+    with _inflight_lock:
+        fetch = _inflight.get(url_or_volid)
+        leading = fetch is None
+        if fetch is None:
+            fetch = _Fetch()
+            _inflight[url_or_volid] = fetch
+
+    if not leading:
+        logger.info("Waiting for an in-progress transfer of %s", url_or_volid)
+        fetch.done.wait()
+        if fetch.error is not None:
+            raise fetch.error
+        # A leader that somehow finished without either is treated as a miss.
+        if fetch.volid is not None:
+            return fetch.volid
+        return _ensure_iso_available(proxmox, url_or_volid, node)
+
+    try:
+        fetch.volid = _fetch_iso(proxmox, url_or_volid, node)
+        return fetch.volid
+    except BaseException as exc:
+        fetch.error = exc
+        raise
+    finally:
+        with _inflight_lock:
+            _inflight.pop(url_or_volid, None)
+        fetch.done.set()
+
+
+def _fetch_iso(proxmox: ProxmoxAPI, url_or_volid: str, node: str) -> str:
     """
     Return a storage:iso/… volid, downloading + uploading if needed.
     Supports HTTP/S URLs and local storage references.
@@ -189,31 +249,40 @@ def _ensure_iso_available(proxmox: ProxmoxAPI, url_or_volid: str, node: str) -> 
                             time.sleep(2)
 
                     except Exception as api_error:
-                        # The direct copy below writes to the storage directory as
-                        # the daemon's own OS user, which bypasses Proxmox entirely.
-                        # That is an acceptable fallback for a transient API fault,
-                        # but not for a refusal: falling back on 401/403 would carry
-                        # out precisely the operation Proxmox just denied.
+                        # Refusals are never worked around. The upload is where
+                        # Proxmox checks whether the caller may write to this
+                        # storage, so falling back past a 401 or 403 would carry
+                        # out exactly the operation that was just denied.
                         if isinstance(api_error, ResourceException) and api_error.status_code in (401, 403):
                             logger.warning(
-                                "API upload refused for %s (HTTP %s); not falling back to direct copy",
+                                "Upload of %s refused (HTTP %s); not writing it directly",
                                 fname,
                                 api_error.status_code,
                             )
                             raise
 
-                        logger.warning("API upload failed: %s, trying direct file copy", str(api_error))
+                        # Anything else falls back to writing the file into the
+                        # storage directory. That is not a nicety: the upload API
+                        # rejects this request outright on at least some Proxmox
+                        # installations -- a one kilobyte file comes back "400 Bad
+                        # Request" with an empty error body, on both proxmoxer
+                        # 2.2 and 2.3 -- so without this, virtual media does not
+                        # work there at all.
+                        #
+                        # The write runs as the daemon's OS user, so it is
+                        # deliberately placed after the permission check above: a
+                        # caller Proxmox refuses is refused here too, and only a
+                        # caller it accepted reaches this path.
+                        logger.warning(
+                            "Upload of %s failed (%s); writing it to the storage directory instead",
+                            fname,
+                            api_error,
+                        )
 
-                        # Fallback: Direct file copy to storage directory with atomic write
                         try:
                             logger.info("Copying ISO to: %s", iso_path)
-
-                            # Ensure directory exists
                             os.makedirs(os.path.dirname(iso_path), exist_ok=True)
-
-                            # Use atomic file write to prevent corruption
                             atomic_file_write(tmp.name, iso_path)
-
                             logger.info("Direct file copy completed successfully")
 
                         except Exception as copy_error:

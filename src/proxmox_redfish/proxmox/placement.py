@@ -10,6 +10,7 @@ Placement therefore comes from /cluster/resources, which is available on a
 standalone installation as well as a cluster, so one path serves both.
 """
 
+import threading
 import weakref
 from typing import Any, Dict, List, MutableMapping
 
@@ -28,6 +29,11 @@ __all__ = ["VMNotFound", "list_vm_ids", "node_for", "vm"]
 # references, so entries disappear with the connection rather than being
 # stored on it.
 _PLACEMENTS: MutableMapping[Any, Dict[int, str]] = weakref.WeakKeyDictionary()
+
+# Requests are served on separate threads, and a WeakKeyDictionary is not safe
+# to mutate from more than one. Entries are per-connection so threads never
+# contend for the same key; the lock protects the mapping itself.
+_PLACEMENTS_LOCK = threading.Lock()
 
 
 def _guests(proxmox: ProxmoxAPI) -> List[Dict[str, Any]]:
@@ -54,15 +60,26 @@ def _guests(proxmox: ProxmoxAPI) -> List[Dict[str, Any]]:
 
 
 def _placements(proxmox: ProxmoxAPI) -> Dict[int, str]:
-    try:
-        cached = _PLACEMENTS[proxmox]
-    except (KeyError, TypeError):
-        cached = {int(g["vmid"]): str(g["node"]) for g in _guests(proxmox) if g.get("node")}
+    with _PLACEMENTS_LOCK:
         try:
-            _PLACEMENTS[proxmox] = cached
+            cached = _PLACEMENTS[proxmox]
+        except (KeyError, TypeError):
+            cached = None
+
+    if cached is not None:
+        return cached
+
+    # Fetched outside the lock: this is a network call, and holding a global
+    # lock across it would serialise every request again.
+    placements = {int(g["vmid"]): str(g["node"]) for g in _guests(proxmox) if g.get("node")}
+
+    with _PLACEMENTS_LOCK:
+        try:
+            _PLACEMENTS[proxmox] = placements
         except TypeError:  # pragma: no cover - object cannot be weakly referenced
             pass
-    return cached
+
+    return placements
 
 
 def node_for(proxmox: ProxmoxAPI, vm_id: Any) -> str:
