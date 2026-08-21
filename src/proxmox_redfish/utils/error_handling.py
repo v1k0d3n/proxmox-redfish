@@ -5,6 +5,7 @@ from typing import Any, Dict, Optional, Tuple, Union
 
 from proxmoxer.core import ResourceException
 
+
 # Proxmox answers 500 when a guest's configuration file is absent, which is
 # what asking about a VM id that does not exist looks like. In Redfish terms
 # the resource is simply missing, and the distinction matters to clients:
@@ -14,6 +15,16 @@ from proxmoxer.core import ResourceException
 # The match is deliberately narrow. Proxmox also answers 500 for a node it
 # cannot resolve and for a storage that is not configured, and neither of
 # those is a missing Redfish resource -- they are faults, and must stay 5xx.
+class VMNotFound(LookupError):
+    """No qemu guest with this id is visible to the caller.
+
+    The cluster listing is filtered by the caller's permissions, so a guest
+    that does not exist and a guest they may not see are indistinguishable
+    from here. Both are reported as missing, which also avoids confirming
+    that an id exists to someone with no rights to it.
+    """
+
+
 MISSING_GUEST_CONFIG = re.compile(r"Configuration file '[^']*/qemu-server/\d+\.conf' does not exist")
 
 
@@ -31,6 +42,20 @@ def handle_proxmox_error(
     Returns:
         tuple: (response_dict, status_code) for Redfish response.
     """
+    if isinstance(exception, VMNotFound):
+        return {
+            "error": {
+                "code": "Base.1.0.ResourceMissingAtURI",
+                "message": f"{operation} failed: {exception}",
+                "@Message.ExtendedInfo": [
+                    {
+                        "MessageId": "Base.1.0.ResourceMissingAtURI",
+                        "Message": f"The resource{' for VM ' + str(vm_id) if vm_id is not None else ''} was not found.",
+                    }
+                ],
+            }
+        }, 404
+
     if not isinstance(exception, ResourceException):
         # Handle unexpected non-Proxmox errors
         return {

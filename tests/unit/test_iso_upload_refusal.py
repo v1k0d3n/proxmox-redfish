@@ -44,7 +44,7 @@ class IsoUploadRefusalTest(unittest.TestCase):
         ):
             raised = None
             try:
-                _ensure_iso_available(proxmox, URL)
+                _ensure_iso_available(proxmox, URL, "node1")
             except Exception as exc:  # noqa: BLE001 - the test inspects it
                 raised = exc
             return copy, raised

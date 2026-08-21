@@ -36,8 +36,9 @@ from ..api.redfish_endpoints import (
 from ..api.virtual_media import manage_virtual_media
 from ..auth.authentication import sessions, validate_token
 from ..config.logging_config import logger
-from ..config.settings import AUTH, PROXMOX_HOST, PROXMOX_NODE, VERIFY_SSL
+from ..config.settings import AUTH, PROXMOX_HOST, VERIFY_SSL
 from ..proxmox.client import get_proxmox_api
+from ..proxmox.placement import list_vm_ids, vm
 from ..proxmox.vm_operations import update_vm_config
 from ..utils.boot_order import reorder_boot_order
 from ..utils.error_handling import handle_proxmox_error
@@ -79,8 +80,7 @@ class RedfishRequestHandler(BaseHTTPRequestHandler):
                 parts = path.split("/")
                 if path == "/redfish/v1/Systems":
                     try:
-                        vm_list = proxmox.nodes(PROXMOX_NODE).qemu.get()
-                        members = [{"@odata.id": f"/redfish/v1/Systems/{vm['vmid']}"} for vm in vm_list]
+                        members = [{"@odata.id": f"/redfish/v1/Systems/{vm_id}"} for vm_id in list_vm_ids(proxmox)]
                         response = {
                             "@odata.id": "/redfish/v1/Systems",
                             "@odata.type": "#SystemCollection.SystemCollection",
@@ -486,7 +486,7 @@ class RedfishRequestHandler(BaseHTTPRequestHandler):
                                 }
                             else:
                                 bios_setting = "seabios" if mode == "BIOS" else "ovmf"
-                                task = proxmox.nodes(PROXMOX_NODE).qemu(vm_id).config.set(bios=bios_setting)
+                                task = vm(proxmox, vm_id).config.set(bios=bios_setting)
                                 response = {
                                     "@odata.id": f"/redfish/v1/TaskService/Tasks/{task}",
                                     "@odata.type": "#Task.v1_0_0.Task",
@@ -543,7 +543,7 @@ class RedfishRequestHandler(BaseHTTPRequestHandler):
                         else:
                             firmware_mode = mode_map[mode]
                             bios_setting = "seabios" if firmware_mode == "BIOS" else "ovmf"
-                            task = proxmox.nodes(PROXMOX_NODE).qemu(vm_id).config.set(bios=bios_setting)
+                            task = vm(proxmox, vm_id).config.set(bios=bios_setting)
                             response = {
                                 "@odata.id": f"/redfish/v1/TaskService/Tasks/{task}",
                                 "@odata.type": "#Task.v1_0_0.Task",
@@ -627,7 +627,7 @@ class RedfishRequestHandler(BaseHTTPRequestHandler):
                             # Check the VM's current power state
                             logger.debug(f"Checking power state for VM {vm_id}")
                             try:
-                                status = proxmox.nodes(PROXMOX_NODE).qemu(vm_id).status.current.get()
+                                status = vm(proxmox, vm_id).status.current.get()
                                 logger.debug(f"VM {vm_id} status: {status['status']}")
                             except Exception as e:
                                 logger.error(f"Failed to get VM {vm_id} status: {str(e)}")
@@ -661,13 +661,13 @@ class RedfishRequestHandler(BaseHTTPRequestHandler):
                             # Proceed with boot order change
                             logger.debug(f"VM {vm_id}, proceeding with boot order change to {target}")
                             try:
-                                config = proxmox.nodes(PROXMOX_NODE).qemu(vm_id).config.get()
+                                config = vm(proxmox, vm_id).config.get()
                                 current_boot = config.get("boot", "")
                                 logger.debug(f"Current boot order: {current_boot}")
                                 new_boot_order = reorder_boot_order(proxmox, int(vm_id), current_boot, target)
                                 logger.debug(f"New boot order: {new_boot_order}")
                                 config_data = {"boot": f"order={new_boot_order}" if new_boot_order else ""}
-                                task = proxmox.nodes(PROXMOX_NODE).qemu(vm_id).config.post(**config_data)
+                                task = vm(proxmox, vm_id).config.post(**config_data)
                                 logger.debug(f"Boot order update task initiated: {task}")
                                 response = {
                                     "@odata.id": f"/redfish/v1/TaskService/Tasks/{task}",

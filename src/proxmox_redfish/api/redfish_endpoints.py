@@ -7,18 +7,18 @@ from typing import Any, Dict, Tuple, Union
 from proxmoxer import ProxmoxAPI
 
 from ..config.logging_config import logger
-from ..config.settings import PROXMOX_NODE
+from ..proxmox.placement import vm
 from ..utils.error_handling import handle_proxmox_error
 
 
 def get_vm_status(proxmox: ProxmoxAPI, vm_id: int) -> Union[Dict[str, Any], Tuple[Dict[str, Any], int]]:
     """Get VM status information."""
     try:
-        status = proxmox.nodes(PROXMOX_NODE).qemu(vm_id).status.current.get()
+        status = vm(proxmox, vm_id).status.current.get()
         if status is None:
             return handle_proxmox_error("VM status retrieval", Exception("Failed to retrieve VM status"), vm_id)
 
-        config = proxmox.nodes(PROXMOX_NODE).qemu(vm_id).config.get()
+        config = vm(proxmox, vm_id).config.get()
         if config is None:
             return handle_proxmox_error("VM status retrieval", Exception("Failed to retrieve VM configuration"), vm_id)
 
@@ -108,7 +108,7 @@ def get_vm_status(proxmox: ProxmoxAPI, vm_id: int) -> Union[Dict[str, Any], Tupl
 def get_bios(proxmox: ProxmoxAPI, vm_id: int) -> Union[Dict[str, Any], Tuple[Dict[str, Any], int]]:
     """Get BIOS information for a VM."""
     try:
-        config = proxmox.nodes(PROXMOX_NODE).qemu(vm_id).config.get()
+        config = vm(proxmox, vm_id).config.get()
         if config is None:
             return handle_proxmox_error("BIOS retrieval", Exception("Failed to retrieve VM configuration"), vm_id)
         firmware_type = config.get("bios", "seabios")
@@ -184,7 +184,7 @@ def get_vm_config(proxmox: ProxmoxAPI, vm_id: int) -> Union[Dict[str, Any], Tupl
     Returns a subset of data for custom use, but prefer get_vm_status for Redfish compliance.
     """
     try:
-        config = proxmox.nodes(PROXMOX_NODE).qemu(vm_id).config.get()
+        config = vm(proxmox, vm_id).config.get()
         if config is None:
             return handle_proxmox_error(
                 "Configuration retrieval", Exception("Failed to retrieve VM configuration"), vm_id
@@ -203,7 +203,7 @@ def get_vm_config(proxmox: ProxmoxAPI, vm_id: int) -> Union[Dict[str, Any], Tupl
 def get_processor_collection(proxmox: ProxmoxAPI, vm_id: int) -> Union[Dict[str, Any], Tuple[Dict[str, Any], int]]:
     """Get processor collection for a VM."""
     try:
-        config = proxmox.nodes(PROXMOX_NODE).qemu(vm_id).config.get()
+        config = vm(proxmox, vm_id).config.get()
         if config is None:
             return handle_proxmox_error(
                 "Processor collection retrieval", Exception("Failed to retrieve VM configuration"), vm_id
@@ -226,7 +226,7 @@ def get_processor_detail(
 ) -> Union[Dict[str, Any], Tuple[Dict[str, Any], int]]:
     """Get processor detail for a VM."""
     try:
-        config = proxmox.nodes(PROXMOX_NODE).qemu(vm_id).config.get()
+        config = vm(proxmox, vm_id).config.get()
         if config is None:
             return handle_proxmox_error(
                 "Processor detail retrieval", Exception("Failed to retrieve VM configuration"), vm_id
@@ -307,7 +307,7 @@ def get_storage_detail(
                 "error": {"code": "Base.1.0.ResourceMissingAtURI", "message": f"Storage {storage_id} not found"}
             }, 404
 
-        config = proxmox.nodes(PROXMOX_NODE).qemu(vm_id).config.get()
+        config = vm(proxmox, vm_id).config.get()
         if config is None:
             return handle_proxmox_error(
                 "Storage detail retrieval", Exception("Failed to retrieve VM configuration"), vm_id
@@ -345,7 +345,7 @@ def get_drive_detail(
                 "error": {"code": "Base.1.0.ResourceMissingAtURI", "message": f"Storage {storage_id} not found"}
             }, 404
 
-        config = proxmox.nodes(PROXMOX_NODE).qemu(vm_id).config.get()
+        config = vm(proxmox, vm_id).config.get()
         if config is None:
             return handle_proxmox_error(
                 "Drive detail retrieval", Exception("Failed to retrieve VM configuration"), vm_id
@@ -380,7 +380,7 @@ def get_volume_collection(
                 "error": {"code": "Base.1.0.ResourceMissingAtURI", "message": f"Storage {storage_id} not found"}
             }, 404
 
-        config = proxmox.nodes(PROXMOX_NODE).qemu(vm_id).config.get()
+        config = vm(proxmox, vm_id).config.get()
         if config is None:
             return handle_proxmox_error(
                 "Volume collection retrieval", Exception("Failed to retrieve VM configuration"), vm_id
@@ -416,7 +416,7 @@ def get_controller_collection(
                 "error": {"code": "Base.1.0.ResourceMissingAtURI", "message": f"Storage {storage_id} not found"}
             }, 404
 
-        config = proxmox.nodes(PROXMOX_NODE).qemu(vm_id).config.get()
+        config = vm(proxmox, vm_id).config.get()
         if config is None:
             return handle_proxmox_error(
                 "Controller collection retrieval", Exception("Failed to retrieve VM configuration"), vm_id
@@ -449,7 +449,7 @@ def get_ethernet_interface_collection(
 ) -> Union[Dict[str, Any], Tuple[Dict[str, Any], int]]:
     """Get ethernet interface collection for a VM."""
     try:
-        config = proxmox.nodes(PROXMOX_NODE).qemu(vm_id).config.get()
+        config = vm(proxmox, vm_id).config.get()
         if config is None:
             return handle_proxmox_error(
                 "Ethernet interface collection retrieval", Exception("Failed to retrieve VM configuration"), vm_id
@@ -479,7 +479,7 @@ def get_ethernet_interface_detail(
 ) -> Union[Dict[str, Any], Tuple[Dict[str, Any], int]]:
     """Get ethernet interface detail for a VM."""
     try:
-        config = proxmox.nodes(PROXMOX_NODE).qemu(vm_id).config.get()
+        config = vm(proxmox, vm_id).config.get()
         if config is None:
             return handle_proxmox_error(
                 "Ethernet interface detail retrieval", Exception("Failed to retrieve VM configuration"), vm_id
@@ -505,7 +505,7 @@ def get_ethernet_interface_detail(
 def get_virtual_media(proxmox: ProxmoxAPI, vm_id: int) -> Union[Dict[str, Any], Tuple[Dict[str, Any], int]]:
     """Get virtual media information for a Proxmox VM."""
     try:
-        config = proxmox.nodes(PROXMOX_NODE).qemu(vm_id).config.get()
+        config = vm(proxmox, vm_id).config.get()
         if config is None:
             return handle_proxmox_error(
                 "Virtual media retrieval", Exception("Failed to retrieve VM configuration"), vm_id
@@ -544,7 +544,7 @@ def get_manager(proxmox: ProxmoxAPI, manager_id: int) -> Union[Dict[str, Any], T
         vm_id = manager_id
 
         # Get VM config to verify it exists
-        config = proxmox.nodes(PROXMOX_NODE).qemu(vm_id).config.get()
+        config = vm(proxmox, vm_id).config.get()
         if config is None:
             return handle_proxmox_error("Manager retrieval", Exception("Failed to retrieve VM configuration"), vm_id)
 

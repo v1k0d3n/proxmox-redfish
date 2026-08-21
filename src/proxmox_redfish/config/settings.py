@@ -6,7 +6,12 @@ import os
 PROXMOX_HOST = os.getenv("PROXMOX_HOST", "pve-node-hostname")
 PROXMOX_USER = os.getenv("PROXMOX_USER", "username")
 PROXMOX_PASSWORD = os.getenv("PROXMOX_PASSWORD", "password")
-PROXMOX_NODE = os.getenv("PROXMOX_NODE", "pve=-node-name")
+# Optional. When set, the daemon manages only the guests on that node, which
+# is how a single-node deployment has always behaved. Left unset, guests are
+# found wherever they run, so one setting covers a standalone host and a
+# cluster. The previous default was a placeholder string that matched no real
+# node, so anything relying on the default was already broken.
+PROXMOX_NODE = os.getenv("PROXMOX_NODE", "")
 PROXMOX_API_PORT = os.getenv("PROXMOX_API_PORT", "8006")
 VERIFY_SSL = os.getenv("VERIFY_SSL", "false").lower() == "true"
 # ISO storage configuration - specifies the storage pool for ISO downloads

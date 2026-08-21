@@ -3,7 +3,7 @@
 from proxmoxer import ProxmoxAPI
 
 from ..config.logging_config import logger
-from ..config.settings import PROXMOX_NODE
+from ..proxmox.placement import vm
 
 
 def reorder_boot_order(proxmox: ProxmoxAPI, vm_id: int, current_order: str, target: str) -> str:
@@ -12,7 +12,7 @@ def reorder_boot_order(proxmox: ProxmoxAPI, vm_id: int, current_order: str, targ
     Returns the new boot order string for Proxmox config.
     """
     try:
-        config = proxmox.nodes(PROXMOX_NODE).qemu(vm_id).config.get()
+        config = vm(proxmox, vm_id).config.get()
         if config is None:
             raise ValueError("Failed to retrieve VM configuration")
 

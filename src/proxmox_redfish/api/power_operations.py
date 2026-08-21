@@ -5,7 +5,7 @@ from typing import Any, Dict, Tuple
 from proxmoxer import ProxmoxAPI
 
 from ..config.logging_config import logger
-from ..config.settings import PROXMOX_NODE
+from ..proxmox.placement import vm
 from ..utils.error_handling import handle_proxmox_error
 
 
@@ -13,7 +13,7 @@ def power_on(proxmox: ProxmoxAPI, vm_id: int) -> Tuple[Dict[str, Any], int]:
     """Power on a VM."""
     logger.info("Power On request for VM %s", vm_id)
     try:
-        task = proxmox.nodes(PROXMOX_NODE).qemu(vm_id).status.start.post()
+        task = vm(proxmox, vm_id).status.start.post()
         logger.info("Power On initiated for VM %s, task: %s", vm_id, task)
         return {
             "@odata.id": f"/redfish/v1/TaskService/Tasks/{task}",
@@ -32,7 +32,7 @@ def power_on(proxmox: ProxmoxAPI, vm_id: int) -> Tuple[Dict[str, Any], int]:
 def power_off(proxmox: ProxmoxAPI, vm_id: int) -> Tuple[Dict[str, Any], int]:
     """Power off a VM gracefully."""
     try:
-        task = proxmox.nodes(PROXMOX_NODE).qemu(vm_id).status.shutdown.post()
+        task = vm(proxmox, vm_id).status.shutdown.post()
         return {
             "@odata.id": f"/redfish/v1/TaskService/Tasks/{task}",
             "@odata.type": "#Task.v1_0_0.Task",
@@ -49,7 +49,7 @@ def power_off(proxmox: ProxmoxAPI, vm_id: int) -> Tuple[Dict[str, Any], int]:
 def reboot(proxmox: ProxmoxAPI, vm_id: int) -> Tuple[Dict[str, Any], int]:
     """Reboot a VM gracefully."""
     try:
-        task = proxmox.nodes(PROXMOX_NODE).qemu(vm_id).status.reboot.post()
+        task = vm(proxmox, vm_id).status.reboot.post()
         return {
             "@odata.id": f"/redfish/v1/TaskService/Tasks/{task}",
             "@odata.type": "#Task.v1_0_0.Task",
@@ -75,7 +75,7 @@ def reset_vm(proxmox: ProxmoxAPI, vm_id: int) -> Tuple[Dict[str, Any], int]:
         Tuple of (response_dict, status_code) for Redfish response
     """
     try:
-        task = proxmox.nodes(PROXMOX_NODE).qemu(vm_id).status.reset.post()
+        task = vm(proxmox, vm_id).status.reset.post()
         return {
             "@odata.id": f"/redfish/v1/TaskService/Tasks/{task}",
             "@odata.type": "#Task.v1_0_0.Task",
@@ -92,7 +92,7 @@ def reset_vm(proxmox: ProxmoxAPI, vm_id: int) -> Tuple[Dict[str, Any], int]:
 def suspend_vm(proxmox: ProxmoxAPI, vm_id: int) -> Tuple[Dict[str, Any], int]:
     """Suspend a VM."""
     try:
-        task = proxmox.nodes(PROXMOX_NODE).qemu(vm_id).status.suspend.post()
+        task = vm(proxmox, vm_id).status.suspend.post()
         return {
             "@odata.id": f"/redfish/v1/TaskService/Tasks/{task}",
             "@odata.type": "#Task.v1_0_0.Task",
@@ -109,7 +109,7 @@ def suspend_vm(proxmox: ProxmoxAPI, vm_id: int) -> Tuple[Dict[str, Any], int]:
 def resume_vm(proxmox: ProxmoxAPI, vm_id: int) -> Tuple[Dict[str, Any], int]:
     """Resume a suspended VM."""
     try:
-        task = proxmox.nodes(PROXMOX_NODE).qemu(vm_id).status.resume.post()
+        task = vm(proxmox, vm_id).status.resume.post()
         return {
             "@odata.id": f"/redfish/v1/TaskService/Tasks/{task}",
             "@odata.type": "#Task.v1_0_0.Task",
@@ -126,7 +126,7 @@ def resume_vm(proxmox: ProxmoxAPI, vm_id: int) -> Tuple[Dict[str, Any], int]:
 def stop_vm(proxmox: ProxmoxAPI, vm_id: int) -> Tuple[Dict[str, Any], int]:
     """Hard stop a VM."""
     try:
-        task = proxmox.nodes(PROXMOX_NODE).qemu(vm_id).status.stop.post()
+        task = vm(proxmox, vm_id).status.stop.post()
         return {
             "@odata.id": f"/redfish/v1/TaskService/Tasks/{task}",
             "@odata.type": "#Task.v1_0_0.Task",
