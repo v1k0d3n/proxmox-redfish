@@ -11,6 +11,8 @@ Environment="PROXMOX_HOST=192.168.1.55"
 # Proxmox account of its own. PROXMOX_USER and PROXMOX_PASSWORD are no
 # longer read; grant privileges to the calling accounts instead. See
 # "Proxmox Permissions" in docs/admins.
+# Restrict the daemon to one node. Omit to manage a whole cluster
+# (experimental); see "Single Node and Clusters" in the admin guide.
 Environment="PROXMOX_NODE=pve"
 Environment="REDFISH_LOGGING_ENABLED=True"
 Environment="REDFISH_LOG_LEVEL=INFO"

@@ -5,8 +5,8 @@ from typing import Any, Dict, Optional, Tuple
 from proxmoxer import ProxmoxAPI
 
 from ..config.logging_config import logger
-from ..config.settings import PROXMOX_NODE
 from ..proxmox.iso_manager import _ensure_iso_available
+from ..proxmox.placement import node_for, vm
 from ..utils.error_handling import handle_proxmox_error
 
 
@@ -28,7 +28,7 @@ def manage_virtual_media(
     logger.info("VirtualMedia operation: action=%s, vm_id=%s, iso_path=%s", action, vm_id, iso_path)
 
     try:
-        vm_config = proxmox.nodes(PROXMOX_NODE).qemu(vm_id).config
+        vm_config = vm(proxmox, vm_id).config
 
         if action == "InsertMedia":
             if not iso_path:
@@ -38,7 +38,7 @@ def manage_virtual_media(
                 }, 400
 
             logger.info("Processing InsertMedia for VM %s with ISO: %s", vm_id, iso_path)
-            iso_path = _ensure_iso_available(proxmox, iso_path)
+            iso_path = _ensure_iso_available(proxmox, iso_path, node_for(proxmox, vm_id))
             logger.info("ISO prepared for VM %s: %s", vm_id, iso_path)
 
             config_data = {"ide2": f"{iso_path},media=cdrom"}

@@ -59,6 +59,8 @@ class ParseSmbiosTest(unittest.TestCase):
 class ComputerSystemResourceTest(unittest.TestCase):
     def _system(self, smbios1):
         proxmox = MagicMock()
+        # The daemon resolves which node a guest is on before addressing it.
+        proxmox.cluster.resources.get.return_value = [{"vmid": 1, "node": "n1", "type": "qemu"}]
         qemu = proxmox.nodes.return_value.qemu.return_value
         qemu.status.current.get.return_value = {"status": "stopped"}
         qemu.config.get.return_value = {"name": "vm", "memory": 2048, "smbios1": smbios1}

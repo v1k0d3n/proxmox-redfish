@@ -87,6 +87,12 @@ class TestRedfishProxmox(unittest.TestCase):
         """Create a mock Proxmox API instance"""
         mock_proxmox = Mock()
 
+        # Placement: the daemon asks the cluster where a guest lives before
+        # addressing it, so a mock has to answer that too.
+        mock_proxmox.cluster.resources.get.return_value = [
+            {"vmid": int(self.test_vm_id), "node": "test-node", "type": "qemu", "name": "test-vm"}
+        ]
+
         # Mock VM list
         mock_proxmox.nodes.return_value.qemu.get.return_value = self.mock_vm_list
 
@@ -359,7 +365,7 @@ class TestRedfishProxmox(unittest.TestCase):
         mock_proxmox = self.create_mock_proxmox()
         iso_path = "local:iso/test.iso"
 
-        result = _ensure_iso_available(mock_proxmox, iso_path)
+        result = _ensure_iso_available(mock_proxmox, iso_path, "node1")
 
         self.assertEqual(result, iso_path)  # Should return unchanged for local storage
 
@@ -370,7 +376,7 @@ class TestRedfishProxmox(unittest.TestCase):
 
         # Test with a local storage reference (should return unchanged)
         local_iso = "local:iso/test.iso"
-        result = _ensure_iso_available(mock_proxmox, local_iso)
+        result = _ensure_iso_available(mock_proxmox, local_iso, "node1")
         self.assertEqual(result, local_iso)
 
         # Test with a URL - just verify the function handles it without hanging
@@ -456,6 +462,9 @@ class TestMetal3Compatibility(unittest.TestCase):
     def test_metal3_boot_source_override(self):
         """Test Metal3 boot source override functionality"""
         mock_proxmox = Mock()
+        mock_proxmox.cluster.resources.get.return_value = [
+            {"vmid": int(self.test_vm_id), "node": "pve-node", "type": "qemu"}
+        ]
         mock_proxmox.nodes.return_value.qemu.return_value.config.get.return_value = {
             "boot": "order=scsi0;ide2;net0",
             "ide2": "none,media=cdrom",
@@ -474,6 +483,9 @@ class TestMetal3Compatibility(unittest.TestCase):
     def test_metal3_power_states(self):
         """Test Metal3 power state compatibility"""
         mock_proxmox = Mock()
+        mock_proxmox.cluster.resources.get.return_value = [
+            {"vmid": int(self.test_vm_id), "node": "pve-node", "type": "qemu"}
+        ]
         mock_proxmox.nodes.return_value.qemu.return_value.status.current.get.return_value = {"status": "running"}
         mock_proxmox.nodes.return_value.qemu.return_value.config.get.return_value = {
             "name": "test-vm",

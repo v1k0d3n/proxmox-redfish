@@ -17,7 +17,7 @@ The daemon can be configured using environment variables. Here are all available
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PROXMOX_HOST` | `pve-node-hostname` | Proxmox hostname or IP address |
-| `PROXMOX_NODE` | `pve-node-name` | Proxmox node name |
+| `PROXMOX_NODE` | _(unset)_ | Restrict the daemon to one node. Unset means guests are found wherever they run (experimental). |
 | `PROXMOX_ISO_STORAGE` | `local` | Storage pool for ISO downloads |
 | `VERIFY_SSL` | `false` | Verify SSL certificates for Proxmox API |
 
@@ -126,6 +126,87 @@ The calling account needs `Datastore.AllocateTemplate` to upload, and
 `Datastore.Audit` to see the storage at all. A storage the caller cannot see
 is reported as not found — the storage list Proxmox returns is filtered by
 the caller's permissions.
+
+
+## Single Node and Clusters
+
+The daemon addresses a guest by its VM id. Proxmox ids are unique across a
+cluster, so an id identifies one guest wherever it runs, and the node it
+runs on is looked up rather than configured.
+
+### Single node
+
+Set `PROXMOX_NODE` to the node's name. The daemon manages only the guests on
+that node and ignores anything else. This is the default arrangement and the
+one most deployments use.
+
+```bash
+export PROXMOX_HOST="proxmox.example.com"
+export PROXMOX_NODE="pve"
+```
+
+### Cluster (experimental)
+
+Leave `PROXMOX_NODE` unset. The daemon then finds each guest wherever it is
+running, so a guest that migrates keeps working without a configuration
+change, and every node's guests are reachable through one endpoint.
+
+```bash
+export PROXMOX_HOST="proxmox.example.com"
+# PROXMOX_NODE deliberately unset
+```
+
+> **Experimental.** Cluster operation has been exercised against a single
+> node and reviewed against the Proxmox API, but not yet run on a real
+> multi-node cluster. If you use it, please report what you find --
+> especially around migration and shared storage. Feedback is welcome on
+> the issue tracker.
+
+### Requirements for cluster operation
+
+**A shared ISO storage.** `VirtualMedia.InsertMedia` uploads an image to the
+node that will attach it. A node-local `dir` storage cannot serve a guest on
+another node, so a guest that migrates would lose access to its image. Use a
+storage that reports `shared: 1` -- NFS, CIFS or CephFS -- and set
+`PROXMOX_ISO_STORAGE` to it. See "ISO Storage" above for which types work.
+
+**Permissions on every node's guests.** Proxmox permissions are cluster-wide,
+so a role granted at `/vms` applies everywhere. Granting per-VM works too, it
+is simply more entries to maintain.
+
+### Restricting which guests a caller manages
+
+A caller only ever sees guests their Proxmox permissions allow, because the
+listing the daemon uses is filtered by those permissions. That is the
+supported way to limit scope, and it needs nothing from this daemon.
+
+Pools are a convenient unit for it. A pool groups guests, and `/pool/<name>`
+is a permission path, so one grant covers everything in the pool:
+
+```bash
+pveum pool add openshift
+pveum pool modify openshift --vms 100,101,102
+pveum acl modify /pool/openshift --users bmcadmin@pve --roles RedfishOperator
+```
+
+That account will then see exactly those guests in `/redfish/v1/Systems`, on
+whichever nodes they run. Note that pool membership alone grants nothing --
+the role has to be granted on the pool path.
+
+A pool can contain storage as well, so the ISO storage can be granted in the
+same place if you prefer to manage it that way.
+
+### What an unknown id returns
+
+A request for an id the caller cannot see returns 404. The listing is
+filtered by permission, so a guest that does not exist and a guest the
+caller may not see are indistinguishable to the daemon. Reporting both as
+missing also avoids confirming that an id exists to someone with no rights
+to it.
+
+Container ids behave the same way. Containers share the id namespace with
+virtual machines but are not managed through this daemon, so their ids are
+reported as missing.
 
 
 ## Proxmox Permissions

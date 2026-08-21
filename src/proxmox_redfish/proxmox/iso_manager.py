@@ -12,7 +12,6 @@ from proxmoxer.core import ResourceException
 from ..config.logging_config import logger
 from ..config.settings import (
     PROXMOX_ISO_STORAGE,
-    PROXMOX_NODE,
     VERIFY_SSL,
 )
 from ..utils.file_operations import (
@@ -59,7 +58,7 @@ def iso_directory(proxmox: ProxmoxAPI, storage_name: str) -> str:
     raise ValueError(f"Storage {storage_name} was not found, or the caller may not see it")
 
 
-def _ensure_iso_available(proxmox: ProxmoxAPI, url_or_volid: str) -> str:
+def _ensure_iso_available(proxmox: ProxmoxAPI, url_or_volid: str, node: str) -> str:
     """
     Return a storage:iso/… volid, downloading + uploading if needed.
     Supports HTTP/S URLs and local storage references.
@@ -68,6 +67,8 @@ def _ensure_iso_available(proxmox: ProxmoxAPI, url_or_volid: str) -> str:
     Args:
         proxmox: ProxmoxAPI instance
         url_or_volid: HTTP/S URL or storage:iso/... reference
+        node: node that will attach the ISO; the upload has to land there,
+            since a node-local storage cannot serve a guest elsewhere
 
     Returns:
         str: storage:iso/filename reference for Proxmox
@@ -170,13 +171,13 @@ def _ensure_iso_available(proxmox: ProxmoxAPI, url_or_volid: str) -> str:
                     # Try API upload first, fallback to direct file copy if it fails
                     try:
                         logger.info("Attempting API upload to storage %s", PROXMOX_ISO_STORAGE)
-                        upload = proxmox.nodes(PROXMOX_NODE).storage(PROXMOX_ISO_STORAGE).upload
+                        upload = proxmox.nodes(node).storage(PROXMOX_ISO_STORAGE).upload
                         task = upload.post(content="iso", filename=fname, file=open(tmp.name, "rb"))
 
                         # Wait for the upload task to finish
                         logger.info("API upload task started: %s", task)
                         while True:
-                            status = proxmox.nodes(PROXMOX_NODE).tasks(task).status.get()
+                            status = proxmox.nodes(node).tasks(task).status.get()
                             if status is None:
                                 raise Exception("Failed to get task status")
                             if status.get("status") == "stopped":
