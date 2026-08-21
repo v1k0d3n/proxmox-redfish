@@ -109,8 +109,10 @@ This guide will take you from a fresh Proxmox installation to a fully working Re
    cat > /opt/proxmox-redfish/config/params.env << 'EOF'
    # Proxmox Configuration
    PROXMOX_HOST="$(hostname -I | awk '{print $1}')"
-   PROXMOX_USER="root@pam"
-   PROXMOX_PASSWORD="your-proxmox-root-password"
+   # No Proxmox account is configured here. Each request is served using the
+   # credentials of the Redfish caller, so the daemon holds no account of its
+   # own. Grant privileges to the calling accounts instead -- see "Proxmox
+   # Permissions" in docs/admins.
    PROXMOX_API_PORT="8006"
    PROXMOX_NODE="$(hostname)"
    PROXMOX_ISO_STORAGE="local"
@@ -189,9 +191,9 @@ For production use, create a dedicated user instead of using root:
    # Edit the configuration file
    vi /opt/proxmox-redfish/config/params.env
    
-   # Change these lines:
-   PROXMOX_USER="redfish@pam"
-   PROXMOX_PASSWORD="your-redfish-user-password"
+   # The daemon holds no Proxmox account. Grant privileges to the accounts
+   # that will call the Redfish API instead -- see "Proxmox Permissions" in
+   # docs/admins.
    ```
 
 3. Restart the service

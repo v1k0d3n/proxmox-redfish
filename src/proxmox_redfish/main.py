@@ -7,8 +7,6 @@ for VM operations through the Redfish protocol.
 """
 
 import argparse
-import json
-import logging
 import os
 import sys
 
@@ -16,100 +14,57 @@ from .config.logging_config import logger, setup_logging
 from .server.http_server import run_server
 from .server.ssl_server import run_server_ssl
 
+# Historical default, kept so an existing deployment that relies on it is
+# unaffected.
+DEFAULT_PORT = 8443
+
 
 def main() -> None:
     """Main entry point for the proxmox-redfish daemon."""
     parser = argparse.ArgumentParser(description="Proxmox Redfish Daemon - Redfish API for Proxmox VMs")
-    parser.add_argument("--config", help="Path to configuration file (JSON format)")
     parser.add_argument(
         "--log-level",
-        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
-        default="INFO",
-        help="Logging level (default: INFO)",
+        choices=["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"],
+        help="Logging level. Overrides REDFISH_LOG_LEVEL.",
     )
-    parser.add_argument("--port", type=int, help="Port to run the server on (overrides config)")
-    parser.add_argument("--host", help="Host to bind to (default: 0.0.0.0)")
+    parser.add_argument(
+        "--port",
+        type=int,
+        help=f"Port to listen on. Overrides REDFISH_PORT. Default {DEFAULT_PORT}.",
+    )
+    parser.add_argument(
+        "--host",
+        help="Address to bind to. Overrides REDFISH_HOST. Default is every interface.",
+    )
 
     args = parser.parse_args()
 
-    # Setup logging
-    setup_logging()
-    logging.basicConfig(
-        level=getattr(logging, args.log_level), format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    )
+    setup_logging(args.log_level)
 
-    # Load configuration
-    config = {}
-
-    # Load from config file if specified
-    if args.config:
-        try:
-            with open(args.config, "r") as f:
-                config = json.load(f)
-            logger.info(f"Loaded configuration from {args.config}")
-        except Exception as e:
-            logger.error(f"Failed to load config file {args.config}: {e}")
-            sys.exit(1)
-
-    # Override with environment variables
-    if os.getenv("PROXMOX_HOST"):
-        config.setdefault("proxmox", {})["host"] = os.getenv("PROXMOX_HOST")
-    if os.getenv("PROXMOX_USER"):
-        config.setdefault("proxmox", {})["user"] = os.getenv("PROXMOX_USER")
-    if os.getenv("PROXMOX_PASSWORD"):
-        config.setdefault("proxmox", {})["password"] = os.getenv("PROXMOX_PASSWORD")
-    if os.getenv("REDFISH_PORT"):
-        port_value = os.getenv("REDFISH_PORT")
-        if port_value:
-            config.setdefault("redfish", {})["port"] = int(port_value)
-    if os.getenv("SSL_CERT_FILE"):
-        config.setdefault("redfish", {})["ssl_cert"] = os.getenv("SSL_CERT_FILE")
-    if os.getenv("SSL_KEY_FILE"):
-        config.setdefault("redfish", {})["ssl_key"] = os.getenv("SSL_KEY_FILE")
-    if os.getenv("LOG_LEVEL"):
-        config.setdefault("logging", {})["level"] = os.getenv("LOG_LEVEL")
-
-    # Override with command line arguments
-    if args.port:
-        config.setdefault("redfish", {})["port"] = args.port
-    if args.host:
-        config.setdefault("redfish", {})["host"] = args.host
-
-    # Set defaults
-    config.setdefault("redfish", {}).setdefault("port", 8443)
-    config.setdefault("redfish", {}).setdefault("host", "0.0.0.0")
-    config.setdefault("logging", {}).setdefault("level", "INFO")
-
-    # Validate required configuration.
-    #
-    # Only the host is required. Requests are served using the calling
-    # user's own credentials, so the daemon holds no Proxmox account of
-    # its own; demanding PROXMOX_USER and PROXMOX_PASSWORD would mean
-    # keeping a privileged credential on disk that nothing ever uses.
-    proxmox_config = config.get("proxmox", {})
-    if "host" not in proxmox_config:
-        logger.error("Missing required Proxmox configuration: host")
-        logger.error("Set PROXMOX_HOST via the environment or a config file")
+    # Settings are read from the environment when config.settings is imported,
+    # so that is the one place configuration comes from.
+    if not os.getenv("PROXMOX_HOST"):
+        logger.error("PROXMOX_HOST is not set")
+        logger.error("Set it in the environment; see the administrator guide")
         sys.exit(1)
 
-    # Start the daemon
+    host = args.host if args.host is not None else os.getenv("REDFISH_HOST", "")
+    port = args.port if args.port is not None else int(os.getenv("REDFISH_PORT", str(DEFAULT_PORT)))
+
+    # TLS is used when both a certificate and a key are configured.
+    use_tls = bool(os.getenv("SSL_CERT_FILE")) and bool(os.getenv("SSL_KEY_FILE"))
+
     try:
         logger.info("Starting Proxmox Redfish Daemon...")
-        logger.info(f"Proxmox Host: {proxmox_config['host']}")
-        logger.info(f"Redfish Port: {config['redfish']['port']}")
+        logger.info("Proxmox Host: %s", os.getenv("PROXMOX_HOST"))
+        logger.info("Listening on %s:%s", host or "0.0.0.0", port)
 
-        # Check if SSL certificates are configured
-        ssl_cert = config.get("redfish", {}).get("ssl_cert")
-        ssl_key = config.get("redfish", {}).get("ssl_key")
-
-        if ssl_cert and ssl_key:
-            # Start SSL server
+        if use_tls:
             logger.info("Starting Redfish server with SSL...")
-            run_server_ssl(config["redfish"]["port"])
+            run_server_ssl(port, host)
         else:
-            # Start regular HTTP server
             logger.info("Starting Redfish server without SSL...")
-            run_server(config["redfish"]["port"])
+            run_server(port, host)
 
     except KeyboardInterrupt:
         logger.info("Shutting down Proxmox Redfish Daemon...")

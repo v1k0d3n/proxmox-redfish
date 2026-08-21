@@ -9,9 +9,12 @@ from ..config.settings import SSL_CA_FILE, SSL_CERT_FILE, SSL_KEY_FILE
 from .request_handler import RedfishRequestHandler
 
 
-def run_server_ssl(port: int = 443) -> None:
-    """Run the SSL server on the specified port."""
-    server_address = ("", port)
+def run_server_ssl(port: int = 443, host: str = "") -> None:
+    """Run the SSL server on the specified port.
+
+    An empty host binds every interface, which is the historical behaviour.
+    """
+    server_address = (host, port)
     httpd = socketserver.TCPServer(server_address, RedfishRequestHandler)
 
     # Wrap the socket with SSL
@@ -36,6 +39,6 @@ def run_server_ssl(port: int = 443) -> None:
 
     httpd.socket = context.wrap_socket(httpd.socket, server_side=True)
 
-    print(f"Redfish server running on port {port} with SSL...")
+    print(f"Redfish server running on {host or '0.0.0.0'}:{port} with SSL...")
     logger.info(f"Redfish server started on port {port} with SSL certificates")
     httpd.serve_forever()

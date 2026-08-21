@@ -3,18 +3,23 @@
 import logging
 import logging.handlers
 import os
+from typing import Optional
 
 # Configure logging to send to system journal
 # Logging configuration with configurable levels
 logger = logging.getLogger("proxmox-redfish")
 
 
-def setup_logging() -> None:
-    """Setup logging configuration based on environment variables."""
-    # Get logging level from environment variable
-    # Valid levels: CRITICAL, ERROR, WARNING, INFO, DEBUG
-    # Default to INFO for production use
-    log_level_str = os.getenv("REDFISH_LOG_LEVEL", "INFO").upper()
+def setup_logging(level: Optional[str] = None) -> None:
+    """Configure logging.
+
+    `level` comes from the command line and wins over REDFISH_LOG_LEVEL,
+    which in turn wins over the INFO default. This has to be applied here:
+    logging.basicConfig() installs handlers on the root logger the first
+    time it runs and does nothing on later calls, so a caller cannot raise
+    the level afterwards by calling it again.
+    """
+    log_level_str = (level or os.getenv("REDFISH_LOG_LEVEL", "INFO")).upper()
     log_level_map = {
         "CRITICAL": logging.CRITICAL,
         "ERROR": logging.ERROR,
@@ -27,7 +32,7 @@ def setup_logging() -> None:
     if log_level_str in log_level_map:
         log_level = log_level_map[log_level_str]
     else:
-        print(f"Warning: Invalid REDFISH_LOG_LEVEL '{log_level_str}', using INFO")
+        print(f"Warning: invalid logging level '{log_level_str}', using INFO")
         log_level = logging.INFO
 
     # Check if logging is enabled at all
