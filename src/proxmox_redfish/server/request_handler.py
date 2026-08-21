@@ -70,7 +70,14 @@ class RedfishRequestHandler(BaseHTTPRequestHandler):
                 "Name": "Redfish Root Service",
                 "RedfishVersion": "1.0.0",
                 "Systems": {"@odata.id": "/redfish/v1/Systems"},
+                "Managers": {"@odata.id": "/redfish/v1/Managers"},
                 "TaskService": {"@odata.id": "/redfish/v1/TaskService"},
+                "SessionService": {"@odata.id": "/redfish/v1/SessionService"},
+                # Required by the schema this resource declares. Everything
+                # named here answers, so a client walking the tree from here
+                # reaches the managers, and the virtual media beneath them,
+                # without having to start from a system.
+                "Links": {"Sessions": {"@odata.id": "/redfish/v1/SessionService/Sessions"}},
             }
         else:
             # Require authentication for all other endpoints
@@ -88,6 +95,40 @@ class RedfishRequestHandler(BaseHTTPRequestHandler):
                 elif path.startswith("/redfish/v1/TaskService/Tasks/"):
                     upid = path[len("/redfish/v1/TaskService/Tasks/") :]
                     response = get_task(proxmox, unquote(upid))
+                elif path == "/redfish/v1/Managers":
+                    try:
+                        members = [{"@odata.id": f"/redfish/v1/Managers/{vm_id}"} for vm_id in list_vm_ids(proxmox)]
+                        response = {
+                            "@odata.id": "/redfish/v1/Managers",
+                            "@odata.type": "#ManagerCollection.ManagerCollection",
+                            "Name": "Manager Collection",
+                            "Members": members,
+                            "Members@odata.count": len(members),
+                        }
+                    except Exception as e:
+                        status_code = 500
+                        response = {"error": {"code": "Base.1.0.GeneralError", "message": str(e)}}
+                elif path == "/redfish/v1/SessionService":
+                    response = {
+                        "@odata.id": "/redfish/v1/SessionService",
+                        "@odata.type": "#SessionService.v1_0_0.SessionService",
+                        "Id": "SessionService",
+                        "Name": "Session Service",
+                        # Sessions are only issued when the daemon is
+                        # configured for them; under Basic authentication the
+                        # collection is real but stays empty.
+                        "ServiceEnabled": AUTH == "Session",
+                        "Sessions": {"@odata.id": "/redfish/v1/SessionService/Sessions"},
+                    }
+                elif path == "/redfish/v1/SessionService/Sessions":
+                    members = [{"@odata.id": f"/redfish/v1/SessionService/Sessions/{t}"} for t in list(sessions)]
+                    response = {
+                        "@odata.id": "/redfish/v1/SessionService/Sessions",
+                        "@odata.type": "#SessionCollection.SessionCollection",
+                        "Name": "Session Collection",
+                        "Members": members,
+                        "Members@odata.count": len(members),
+                    }
                 elif path == "/redfish/v1/Systems":
                     try:
                         members = [{"@odata.id": f"/redfish/v1/Systems/{vm_id}"} for vm_id in list_vm_ids(proxmox)]
