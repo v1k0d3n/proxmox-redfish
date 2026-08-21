@@ -8,6 +8,7 @@ from ..config.logging_config import logger
 from ..proxmox.iso_manager import _ensure_iso_available
 from ..proxmox.placement import node_for, vm
 from ..utils.error_handling import handle_proxmox_error
+from ..utils.vm_locks import media_change
 
 EMPTY_DRIVE = "none"
 
@@ -70,61 +71,71 @@ def manage_virtual_media(
     logger.info("VirtualMedia operation: action=%s, vm_id=%s, iso_path=%s", action, vm_id, iso_path)
 
     try:
-        vm_endpoint = vm(proxmox, vm_id)
-        vm_config = vm_endpoint.config
-        current = _attached_volid(vm_endpoint.config.get())
+        # The guest must not be started while its media is still being
+        # changed, so the change is announced for the whole of its
+        # duration -- the fetch included, which is the long part.
+        with media_change(vm_id):
+            vm_endpoint = vm(proxmox, vm_id)
+            vm_config = vm_endpoint.config
+            current = _attached_volid(vm_endpoint.config.get())
 
-        if action == "InsertMedia":
-            if not iso_path:
-                logger.error("InsertMedia failed: No ISO path provided for VM %s", vm_id)
-                return {
-                    "error": {"code": "Base.1.0.InvalidRequest", "message": "ISO path is required for InsertMedia"}
-                }, 400
+            if action == "InsertMedia":
+                if not iso_path:
+                    logger.error("InsertMedia failed: No ISO path provided for VM %s", vm_id)
+                    return {
+                        "error": {"code": "Base.1.0.InvalidRequest", "message": "ISO path is required for InsertMedia"}
+                    }, 400
 
-            # A volid names an image directly, so whether it is already
-            # attached can be answered without fetching anything. A client
-            # that repeats the request -- which they do -- gets an immediate
-            # answer instead of the image being fetched again.
-            if ":iso/" in iso_path and current == iso_path:
-                logger.info("InsertMedia: %s is already attached to VM %s", iso_path, vm_id)
-                return _task_response(None, vm_id, f"Insert Media for VM {vm_id}", f"{iso_path} is already inserted")
+                # A volid names an image directly, so whether it is already
+                # attached can be answered without fetching anything. A client
+                # that repeats the request -- which they do -- gets an immediate
+                # answer instead of the image being fetched again.
+                if ":iso/" in iso_path and current == iso_path:
+                    logger.info("InsertMedia: %s is already attached to VM %s", iso_path, vm_id)
+                    return _task_response(
+                        None, vm_id, f"Insert Media for VM {vm_id}", f"{iso_path} is already inserted"
+                    )
 
-            logger.info("Processing InsertMedia for VM %s with ISO: %s", vm_id, iso_path)
-            # A URL has to be fetched and hashed before its volid is known:
-            # the same URL can serve different images over time, and skipping
-            # that check would attach whatever was there last.
-            resolved = _ensure_iso_available(proxmox, iso_path, node_for(proxmox, vm_id))
-            logger.info("ISO prepared for VM %s: %s", vm_id, resolved)
+                logger.info("Processing InsertMedia for VM %s with ISO: %s", vm_id, iso_path)
+                # A URL has to be fetched and hashed before its volid is known:
+                # the same URL can serve different images over time, and skipping
+                # that check would attach whatever was there last.
+                resolved = _ensure_iso_available(proxmox, iso_path, node_for(proxmox, vm_id))
+                logger.info("ISO prepared for VM %s: %s", vm_id, resolved)
 
-            if current == resolved:
-                logger.info("InsertMedia: VM %s already has %s attached", vm_id, resolved)
-                return _task_response(None, vm_id, f"Insert Media for VM {vm_id}", f"{resolved} is already inserted")
+                if current == resolved:
+                    logger.info("InsertMedia: VM %s already has %s attached", vm_id, resolved)
+                    return _task_response(
+                        None, vm_id, f"Insert Media for VM {vm_id}", f"{resolved} is already inserted"
+                    )
 
-            config_data = {"ide2": f"{resolved},media=cdrom"}
-            logger.debug("Updating VM %s config: %s", vm_id, config_data)
-            task = vm_config.post(**config_data)
+                config_data = {"ide2": f"{resolved},media=cdrom"}
+                logger.debug("Updating VM %s config: %s", vm_id, config_data)
+                task = vm_config.post(**config_data)
 
-            logger.debug("Setting boot order for VM %s to ide2", vm_id)
-            vm_config.post(boot="order=ide2")
+                logger.debug("Setting boot order for VM %s to ide2", vm_id)
+                vm_config.post(boot="order=ide2")
 
-            logger.info("InsertMedia completed successfully for VM %s, task: %s", vm_id, task)
-            return _task_response(task, vm_id, f"Insert Media for VM {vm_id}", f"Mounted ISO {resolved} to VM {vm_id}")
+                logger.info("InsertMedia completed successfully for VM %s, task: %s", vm_id, task)
+                return _task_response(
+                    task, vm_id, f"Insert Media for VM {vm_id}", f"Mounted ISO {resolved} to VM {vm_id}"
+                )
 
-        elif action == "EjectMedia":
-            if current is None:
-                logger.info("EjectMedia: VM %s has no media attached", vm_id)
-                return _task_response(None, vm_id, f"Eject Media from VM {vm_id}", "No media was inserted")
+            elif action == "EjectMedia":
+                if current is None:
+                    logger.info("EjectMedia: VM %s has no media attached", vm_id)
+                    return _task_response(None, vm_id, f"Eject Media from VM {vm_id}", "No media was inserted")
 
-            logger.info("Processing EjectMedia for VM %s", vm_id)
-            config_data = {"ide2": f"{EMPTY_DRIVE},media=cdrom"}
-            logger.debug("Updating VM %s config: %s", vm_id, config_data)
-            task = vm_config.post(**config_data)
+                logger.info("Processing EjectMedia for VM %s", vm_id)
+                config_data = {"ide2": f"{EMPTY_DRIVE},media=cdrom"}
+                logger.debug("Updating VM %s config: %s", vm_id, config_data)
+                task = vm_config.post(**config_data)
 
-            logger.info("EjectMedia completed successfully for VM %s, task: %s", vm_id, task)
-            return _task_response(task, vm_id, f"Eject Media from VM {vm_id}", f"Ejected ISO from VM {vm_id}")
-        else:
-            logger.error("Unsupported VirtualMedia action: %s for VM %s", action, vm_id)
-            return {"error": {"code": "Base.1.0.InvalidRequest", "message": f"Unsupported action: {action}"}}, 400
+                logger.info("EjectMedia completed successfully for VM %s, task: %s", vm_id, task)
+                return _task_response(task, vm_id, f"Eject Media from VM {vm_id}", f"Ejected ISO from VM {vm_id}")
+            else:
+                logger.error("Unsupported VirtualMedia action: %s for VM %s", action, vm_id)
+                return {"error": {"code": "Base.1.0.InvalidRequest", "message": f"Unsupported action: {action}"}}, 400
 
     except Exception as e:
         logger.error("VirtualMedia %s failed for VM %s: %s", action, vm_id, str(e), exc_info=True)
