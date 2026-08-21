@@ -28,28 +28,54 @@ export REDFISH_ISOURL="https://download.fedoraproject.org/pub/fedora/linux/relea
 
 ### Authentication
 
-The daemon supports two authentication methods:
-
-1. **Basic Authentication** (username/password)
-2. **API Token Authentication** (recommended for automation)
+Every request is authenticated with HTTP Basic authentication, using a
+Proxmox account or an API token belonging to one. The daemon then talks to
+Proxmox as that account, so a caller can reach exactly the VMs their Proxmox
+permissions allow. See "Proxmox Permissions" in the administrator guide for
+the privileges an account needs.
 
 ## Authentication Examples
 
-### Basic Authentication
+### Username and password
 
 ```bash
-# Using username and password
 curl -k -u "${REDFISH_USER}:${REDFISH_PASS}" \
-  "${REDFISH_BASEURL}/redfish/v1/"
+  "${REDFISH_BASEURL}/redfish/v1/Systems"
 ```
 
-### API Token Authentication
+### API token
+
+An API token is supplied through the same Basic authentication header. The
+username carries the token id, and the password is the token's secret:
 
 ```bash
-# Using API token (recommended)
-curl -k -H "X-Auth-Token: ${REDFISH_PASS}" \
-  "${REDFISH_BASEURL}/redfish/v1/"
+curl -k -u 'bmcadmin@pve!redfish:<token-secret>' \
+  "${REDFISH_BASEURL}/redfish/v1/Systems"
 ```
+
+Tokens are the better choice for automation. They are sent with each
+request, so no ticket is exchanged first, and they can be revoked in Proxmox
+without touching the account's password.
+
+By default a token is limited to a subset of its owner's rights, so either
+clear "Privilege Separation" on the token or grant it its own permissions.
+
+### `X-Auth-Token` is not supported
+
+Redfish defines `X-Auth-Token` as a session token issued by `SessionService`,
+which this daemon does not implement. A request carrying that header is
+rejected:
+
+```
+{"error": {"code": "Base.1.0.GeneralError",
+           "message": "Basic Authentication required but no valid Authorization header provided"}}
+```
+
+A Proxmox API token is not an `X-Auth-Token` and cannot be used as one. Send
+it through Basic authentication as shown above.
+
+Session authentication is tracked in
+[#4](https://github.com/v1k0d3n/proxmox-redfish/issues/4).
 
 ## System Discovery
 

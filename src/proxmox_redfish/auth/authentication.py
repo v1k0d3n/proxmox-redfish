@@ -129,6 +129,17 @@ def validate_token(headers: Any) -> Tuple[bool, str]:
             except Exception as e:
                 return False, f"Invalid Basic Authentication format: {str(e)}"
         else:
+            # Redfish defines X-Auth-Token as a session token from
+            # SessionService, which is not implemented. A caller sending one is
+            # most likely doing what the user guide used to suggest: passing a
+            # Proxmox API token in that header. Say so, rather than reporting a
+            # missing Authorization header they did not know to send.
+            if headers.get("X-Auth-Token"):
+                return False, (
+                    "X-Auth-Token is not supported; session authentication is not implemented. "
+                    "Supply a Proxmox account or API token using Basic authentication "
+                    "(user@realm!tokenid as the username, the token secret as the password)."
+                )
             return False, "Basic Authentication required but no valid Authorization header provided"
     elif AUTH == "Session":
         token = headers.get("X-Auth-Token")
