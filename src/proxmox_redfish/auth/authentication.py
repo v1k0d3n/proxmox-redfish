@@ -14,6 +14,17 @@ from ..config.settings import (
     VERIFY_SSL,
 )
 
+
+class ProxmoxUnreachable(RuntimeError):
+    """The Proxmox API could not be contacted.
+
+    Distinguished from a rejected credential because the two need opposite
+    responses: one is the caller's to fix, the other the operator's. Reporting
+    an unreachable host as "invalid credentials" sends people looking for a
+    password problem that does not exist.
+    """
+
+
 # Sessions issued by SessionService, keyed by an opaque token.
 #
 # Records must never hold a credential. Anything that iterates or logs this
@@ -102,6 +113,15 @@ def authenticate_user(username: str, password: str) -> bool:
                 logger.warning(f"User {username} authentication failed: HTTP {response.status_code}")
                 return False
 
+    except requests.exceptions.RequestException as e:
+        # DNS failure, refused connection, timeout: nothing to do with the
+        # credentials supplied.
+        logger.error("Could not reach the Proxmox API at %s: %s", PROXMOX_HOST, e)
+        raise ProxmoxUnreachable(
+            f"Could not reach the Proxmox API at {PROXMOX_HOST}:{PROXMOX_API_PORT}. "
+            f"Check PROXMOX_HOST and that the API is reachable from this host."
+        )
+
     except Exception as e:
         logger.warning(f"User {username} authentication failed with exception: {str(e)}")
         return False
@@ -126,6 +146,8 @@ def validate_token(headers: Any) -> Tuple[bool, str]:
                     return True, username
                 else:
                     return False, f"Invalid Basic Authentication credentials for user {username}"
+            except ProxmoxUnreachable as e:
+                return False, str(e)
             except Exception as e:
                 return False, f"Invalid Basic Authentication format: {str(e)}"
         else:

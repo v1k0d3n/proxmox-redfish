@@ -105,16 +105,22 @@ This guide will take you from a fresh Proxmox installation to a fully working Re
 
    Create a configuration file:
    ```bash
-   # Create the configuration file
+   # Find the values to use:
+   #   hostname -I | awk '{print $1}'    -> address for PROXMOX_HOST
+   #   hostname                          -> node name for PROXMOX_NODE
+   #
+   # Write the results below as literal values. This file is read by systemd,
+   # which does not run commands, so a $(...) written here is taken as the
+   # host's name rather than being replaced by its output.
    cat > /opt/proxmox-redfish/config/params.env << 'EOF'
    # Proxmox Configuration
-   PROXMOX_HOST="$(hostname -I | awk '{print $1}')"
+   PROXMOX_HOST="10.0.0.5"
    # No Proxmox account is configured here. Each request is served using the
    # credentials of the Redfish caller, so the daemon holds no account of its
    # own. Grant privileges to the calling accounts instead -- see "Proxmox
    # Permissions" in docs/admins.
    PROXMOX_API_PORT="8006"
-   PROXMOX_NODE="$(hostname)"
+   PROXMOX_NODE="pve"
    PROXMOX_ISO_STORAGE="local"
 
    # SSL Configuration
