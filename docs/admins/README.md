@@ -17,8 +17,6 @@ The daemon can be configured using environment variables. Here are all available
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PROXMOX_HOST` | `pve-node-hostname` | Proxmox hostname or IP address |
-| `PROXMOX_USER` | `username` | Proxmox username (i.e., `root@pam`) |
-| `PROXMOX_PASSWORD` | `password` | Proxmox password or API token |
 | `PROXMOX_NODE` | `pve-node-name` | Proxmox node name |
 | `PROXMOX_ISO_STORAGE` | `local` | Storage pool for ISO downloads |
 | `VERIFY_SSL` | `false` | Verify SSL certificates for Proxmox API |
@@ -57,8 +55,6 @@ mkdir -p /opt/proxmox-redfish/config
 cat > /opt/proxmox-redfish/config/params.env << 'EOF'
 # Proxmox Configuration
 export PROXMOX_HOST="192.168.1.100"
-export PROXMOX_USER="redfish@pam"
-export PROXMOX_PASSWORD="your-secure-password"
 export PROXMOX_NODE="pve"
 export PROXMOX_ISO_STORAGE="local"
 export VERIFY_SSL="false"
@@ -78,35 +74,29 @@ export REDFISH_LOGGING_ENABLED="true"
 EOF
 ```
 
-### JSON Configuration File
+### Command Line Options
 
-For more complex configurations, use JSON format:
+Configuration comes from the environment. These options override it for the
+few settings that are useful to change per invocation:
+
+| Option | Overrides | Default |
+|---|---|---|
+| `--port` | `REDFISH_PORT` | `8443` |
+| `--host` | `REDFISH_HOST` | every interface |
+| `--log-level` | `REDFISH_LOG_LEVEL` | `INFO` |
+
+Precedence is command line, then environment, then the default.
+
+`--host` binds a single address. Restricting the daemon to a provisioning
+interface is worth doing when the host is also reachable from a network that
+has no business reaching it:
 
 ```bash
-cat > /opt/proxmox-redfish/config/config.json << 'EOF'
-{
-  "proxmox": {
-    "host": "192.168.1.100",
-    "user": "redfish@pam",
-    "password": "your-secure-password",
-    "node": "pve",
-    "iso_storage": "local",
-    "verify_ssl": false
-  },
-  "redfish": {
-    "port": 8443,
-    "host": "0.0.0.0",
-    "ssl_cert": "/opt/proxmox-redfish/config/ssl/server.crt",
-    "ssl_key": "/opt/proxmox-redfish/config/ssl/server.key",
-    "ssl_ca": "/opt/proxmox-redfish/config/ssl/ca.crt"
-  },
-  "logging": {
-    "level": "INFO",
-    "enabled": true
-  }
-}
-EOF
+proxmox-redfish --port 8000 --host 10.0.0.5
 ```
+
+TLS is used when both `SSL_CERT_FILE` and `SSL_KEY_FILE` are set. Setting
+only one of them starts the daemon without TLS.
 
 ## ISO Storage
 
@@ -345,10 +335,9 @@ This project is still very new, so things can change over time, but this is how 
 1. Update configuration to use API token
    ```bash
    cat > /opt/proxmox-redfish/config/params.env << 'EOF'
-   # Proxmox Configuration with API Token
+   # Proxmox Configuration. Callers authenticate with their own account or
+   # API token; the daemon holds no credentials.
    export PROXMOX_HOST="192.168.1.100"
-   export PROXMOX_USER="redfish-api@pam"
-   export PROXMOX_PASSWORD="your-api-token-here"
    export PROXMOX_NODE="pve"
    export PROXMOX_ISO_STORAGE="local"
    export VERIFY_SSL="false"
@@ -491,13 +480,13 @@ For enhanced security, run the service as a non-root user:
    ```bash
    source /opt/proxmox-redfish/config/params.env
    echo "PROXMOX_HOST: $PROXMOX_HOST"
-   echo "PROXMOX_USER: $PROXMOX_USER"
+   echo "PROXMOX_NODE: $PROXMOX_NODE"
    echo "SSL_CERT_FILE: $SSL_CERT_FILE"
    ```
 
 4. Test Proxmox connectivity
    ```bash
-   curl -k -u "$PROXMOX_USER:$PROXMOX_PASSWORD" "https://$PROXMOX_HOST:8006/api2/json/version"
+   curl -k -u "<user>@pam:<password>" "https://$PROXMOX_HOST:8006/api2/json/version"
    ```
 
 #### SSL Certificate Issues

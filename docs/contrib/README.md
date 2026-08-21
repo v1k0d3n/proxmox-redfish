@@ -88,7 +88,6 @@ proxmox-redfish/
 #### Configuration Management
 
 - Environment variable support
-- JSON configuration file support
 - SSL certificate management
 - Logging configuration
 
@@ -437,8 +436,6 @@ docker run -d \
   --name proxmox-redfish-dev \
   -p 8443:8443 \
   -e PROXMOX_HOST=your-host \
-  -e PROXMOX_USER=your-user \
-  -e PROXMOX_PASSWORD=your-password \
   proxmox-redfish
 ```
 
