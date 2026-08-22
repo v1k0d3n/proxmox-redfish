@@ -53,30 +53,28 @@ pre-commit install
 proxmox-redfish/
 ├── src/
 │   └── proxmox_redfish/
-│       └── proxmox_redfish.py      # Main daemon implementation
+│       ├── main.py                 # Entry point, command line, startup
+│       ├── api/                    # Redfish resources and actions
+│       ├── auth/                   # Authentication of the caller
+│       ├── config/                 # Settings and logging
+│       ├── proxmox/                # Proxmox client, placement, ISO handling
+│       ├── server/                 # HTTP and TLS servers, request routing
+│       ├── utils/                  # Errors, file and locking helpers
+│       └── proxmox_redfish.py      # Facade re-exporting the above
 ├── tests/
 │   ├── unit/                       # Unit tests
-│   │   ├── test_proxmox_redfish.py
-│   │   └── test_proxmox_redfish_simple.py
-│   └── integration/                # Integration tests
-│       └── test_real_vm_concurrent_iso.py
-├── scripts/                        # Utility scripts
-│   ├── install.sh
-│   ├── setup_ssl.sh
-│   └── dev-setup.sh
-├── config/                         # Configuration examples
-│   ├── ssl/
-│   ├── params.env.example
-│   └── proxmox-redfish.service.example
-├── docs/                           # Documentation
+│   └── integration/                # Integration tests, opt-in
+├── scripts/                        # install.sh, setup_ssl.sh, dev-setup.sh
+├── config/                         # Configuration and unit examples
+├── docs/                           # admins, users, contrib
 ├── requirements.txt                # Runtime dependencies
 ├── requirements-dev.txt            # Development dependencies
-├── pyproject.toml                  # Project configuration
+└── pyproject.toml                  # Project configuration
 ```
 
 ### Key Components
 
-#### Main Daemon (`src/proxmox_redfish/proxmox_redfish.py`)
+#### Facade (`src/proxmox_redfish/proxmox_redfish.py`)
 
 - **RedfishRequestHandler**: HTTP request handler for Redfish API
 - **Power Management Functions**: `power_on()`, `power_off()`, `reboot()`, `reset_vm()`
@@ -355,12 +353,10 @@ pre-commit run --all-files
 git add .
 
 # Commit with descriptive message
-git commit -m "feat: add new Redfish endpoint for system inventory
+git commit -m "Report the processors a guest is configured with
 
-- Add GET /redfish/v1/Systems/{id}/Inventory endpoint
-- Implement inventory collection from Proxmox
-- Add unit tests for inventory functionality
-- Update documentation with new endpoint
+The Processors collection was listed on the system but never served, so a
+client following it got a 404.
 
 Closes #123"
 ```
@@ -594,26 +590,22 @@ bandit -r src/
 
 ## Development Roadmap
 
-### Short Term (Next Release)
+Shipped since the first release: modules in place of a single script,
+requests carried out as the calling account, guests found across a
+cluster, a task service, concurrent request handling with one fetch
+serving many callers, and uploads through the storage API.
 
-- [ ] Add support for more Redfish endpoints
-- [ ] Improve error handling and logging
-- [ ] Add more comprehensive tests
-- [ ] Enhance documentation
+Open, and tracked as issues rather than listed here:
 
-### Medium Term (Next 3 Months)
+- Repeat inserts of a URL already on the storage transfer it again to
+  compare it, where a conditional request would answer the same question
+- Identical images stored under different names are held twice
+- An insert holds the request open for the length of the transfer
 
-- [ ] Add support for multiple Proxmox nodes
-- [ ] Implement caching for better performance
-- [ ] Add metrics and monitoring
-- [ ] Improve security features
+Not started, and worth doing:
 
-### Long Term (Next 6 Months)
-
-- [ ] Add support for Redfish events
-- [ ] Implement advanced authentication methods
-- [ ] Add support for Redfish tasks
-- [ ] Create web-based management interface
+- Redfish events
+- More of the Redfish schema than the daemon covers today
 
 ## Contributing Checklist
 

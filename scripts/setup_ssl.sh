@@ -101,7 +101,7 @@ setup_letsencrypt() {
     
     # Setup renewal
     print_status "Setting up certificate renewal..."
-    echo "0 12 * * * /usr/bin/certbot renew --quiet && sudo cp /etc/letsencrypt/live/$DOMAIN/fullchain.pem /opt/redfish_daemon/config/ssl/server.crt && sudo cp /etc/letsencrypt/live/$DOMAIN/privkey.pem /opt/redfish_daemon/config/ssl/server.key && sudo cp /etc/letsencrypt/live/$DOMAIN/chain.pem /opt/redfish_daemon/config/ssl/ca.crt && sudo chown $USER:$USER /opt/redfish_daemon/config/ssl/* && chmod 600 /opt/redfish_daemon/config/ssl/server.key && chmod 644 /opt/redfish_daemon/config/ssl/server.crt /opt/redfish_daemon/config/ssl/ca.crt" | sudo crontab -
+    echo "0 12 * * * /usr/bin/certbot renew --quiet && sudo cp /etc/letsencrypt/live/$DOMAIN/fullchain.pem /opt/proxmox-redfish/config/ssl/server.crt && sudo cp /etc/letsencrypt/live/$DOMAIN/privkey.pem /opt/proxmox-redfish/config/ssl/server.key && sudo cp /etc/letsencrypt/live/$DOMAIN/chain.pem /opt/proxmox-redfish/config/ssl/ca.crt && sudo chown $USER:$USER /opt/proxmox-redfish/config/ssl/* && chmod 600 /opt/proxmox-redfish/config/ssl/server.key && chmod 644 /opt/proxmox-redfish/config/ssl/server.crt /opt/proxmox-redfish/config/ssl/ca.crt" | sudo crontab -
     
     print_success "Certificate renewal scheduled"
 }
@@ -192,9 +192,9 @@ show_status() {
     
     echo
     print_status "Environment variables:"
-    echo "  SSL_CERT_FILE: ${SSL_CERT_FILE:-/opt/redfish_daemon/config/ssl/server.crt}"
-    echo "  SSL_KEY_FILE: ${SSL_KEY_FILE:-/opt/redfish_daemon/config/ssl/server.key}"
-    echo "  SSL_CA_FILE: ${SSL_CA_FILE:-/opt/redfish_daemon/config/ssl/ca.crt}"
+    echo "  SSL_CERT_FILE: ${SSL_CERT_FILE:-/opt/proxmox-redfish/config/ssl/server.crt}"
+    echo "  SSL_KEY_FILE: ${SSL_KEY_FILE:-/opt/proxmox-redfish/config/ssl/server.key}"
+    echo "  SSL_CA_FILE: ${SSL_CA_FILE:-/opt/proxmox-redfish/config/ssl/ca.crt}"
 }
 
 # Main function
