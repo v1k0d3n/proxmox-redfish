@@ -19,6 +19,7 @@ The daemon can be configured using environment variables. Here are all available
 | `PROXMOX_HOST` | `pve-node-hostname` | Proxmox hostname or IP address |
 | `PROXMOX_NODE` | _(unset)_ | Restrict the daemon to one node. Unset means guests are found wherever they run (experimental). |
 | `PROXMOX_ISO_STORAGE` | `local` | Storage pool for ISO downloads |
+| `PROXMOX_API_PORT` | `8006` | Port the Proxmox API listens on |
 | `VERIFY_SSL` | `false` | Verify SSL certificates for Proxmox API |
 
 #### Redfish Configuration
@@ -32,9 +33,9 @@ The daemon can be configured using environment variables. Here are all available
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `SSL_CERT_FILE` | `/opt/redfish_daemon/config/ssl/server.crt` | SSL certificate file path |
-| `SSL_KEY_FILE` | `/opt/redfish_daemon/config/ssl/server.key` | SSL private key file path |
-| `SSL_CA_FILE` | `/opt/redfish_daemon/config/ssl/ca.crt` | CA certificate bundle (optional) |
+| `SSL_CERT_FILE` | `/opt/proxmox-redfish/config/ssl/server.crt` | SSL certificate file path |
+| `SSL_KEY_FILE` | `/opt/proxmox-redfish/config/ssl/server.key` | SSL private key file path |
+| `SSL_CA_FILE` | `/opt/proxmox-redfish/config/ssl/ca.crt` | CA certificate bundle (optional) |
 
 #### Logging Configuration
 
@@ -464,88 +465,52 @@ chmod 644 /opt/proxmox-redfish/config/ssl/ca.crt
 
 ## User Management
 
-### Creating Dedicated Users
+Creating an account, the role it needs, granting it, and checking the
+result are covered in [Proxmox Permissions](#proxmox-permissions). That
+section is the authoritative one; this covers only what is not about
+permissions.
 
-#### Option 1: Proxmox PAM User
+### Running the daemon as a non-root user
 
-In Proxmox web interface:
-1. Go to **Datacenter** -> **Users**
-2. Click **Add** -> **User**
-3. Create the user (i.e. `redfish@pam`)
-4. Set a strong password
-5. Assign appropriate roles for each of the VMs that user should have access to
+The daemon needs no privilege on the Proxmox host to do its work. Every
+Proxmox operation is carried out as the calling account, and the ISO
+directory it reads to compare images is world readable on a default
+install. What usually keeps it as root is the TLS private key, which is
+readable only by its owner.
 
-#### Option 2: API Token User
+Give a service account that key and the daemon runs unprivileged:
 
-Create a dedicated user for API access
-In Proxmox web interface:
-1. Go to **Datacenter** -> **Users**
-2. Click **Add** -> **User**
-3. Create a user (i.e. `redfish@pam`)
-4. Go to the user's API Tokens tab
-5. Generate a new token with appropriate privileges
+```bash
+useradd -r -s /usr/sbin/nologin -d /opt/proxmox-redfish proxmox-redfish
+chown -R proxmox-redfish:proxmox-redfish /opt/proxmox-redfish
+chown proxmox-redfish /opt/proxmox-redfish/config/ssl/server.key
+```
 
-### Least Privilege Setup
+Point the unit at it and restart:
 
-If you wish to create a user with minimal required permissions, you can use the following steps:
+```bash
+sed -i 's/^User=root/User=proxmox-redfish/' /etc/systemd/system/proxmox-redfish.service
+sed -i 's/^Group=root/Group=proxmox-redfish/' /etc/systemd/system/proxmox-redfish.service
+systemctl daemon-reload
+systemctl restart proxmox-redfish
+```
 
-In Proxmox web interface:
-1. Create a user: (i.e. `redfish-limited@pam`)
-2. Assign the following roles:
-   - `VM.Audit` (read-only access to VM information)
-   - `VM.PowerMgmt` (power management operations)
-   - `VM.Config.CDROM` (virtual media operations)
-   - `Datastore.AllocateSpace` (for ISO downloads)
+Two things to know before doing it. A port below 1024 needs privilege the
+account will not have, so keep the daemon on its default port or another
+above 1024. And if the ISO storage directory is not readable by that
+account, an insert of a URL already on the storage fails when the daemon
+tries to compare the stored image.
 
-3. Limit access to specific VMs if needed:
-   - Right-click on **VM** -> **Permissions**
-   - Add user with specific roles for that VM only
+### What the daemon does with credentials
 
-### Authentication Details
+Nothing. It holds no Proxmox account and stores no credentials. The
+credentials in a request are used to open a connection to Proxmox as that
+caller, and Proxmox decides what happens next. `params.env` holds no
+Proxmox account for this reason.
 
-The intent for this project, in regards to user authentication, is to allow Proxmox roles and permissions to work as normal. This means that a user (i.e. `user@pve`) could be assigned an API token, and that token could be used to manage the VMs that they are configured to manage via existing roles and permissions that are configured in Proxmox.
-
-The way that user is verified is with am account that has the correct permissions to look up access on behalf of the datacenter/pve host. This is configured in the `params.env` file (i.e. `root@pam` with a valid token). This account is used to look up the permissions of other users, and then uses the _user's_ permissions to perform the task. This is an important details, so that administrators are not confused about what account role performs which task.
-
-This project is still very new, so things can change over time, but this is how it's intended to work right now.
-
-1. Update configuration to use API token
-   ```bash
-   cat > /opt/proxmox-redfish/config/params.env << 'EOF'
-   # Proxmox Configuration. Callers authenticate with their own account or
-   # API token; the daemon holds no credentials.
-   export PROXMOX_HOST="192.168.1.100"
-   export PROXMOX_NODE="pve"
-   export PROXMOX_ISO_STORAGE="local"
-   export VERIFY_SSL="false"
-
-   # Other configuration...
-   EOF
-   ```
-
-#### Non-Root Service Account (Advanced)
-
-For enhanced security, run the service as a non-root user:
-
-1. Create dedicated user
-   ```bash
-   useradd -r -s /bin/false -d /opt/proxmox-redfish proxmox-redfish
-   ```
-
-2. Set ownership
-   ```bash
-   chown -R proxmox-redfish:proxmox-redfish /opt/proxmox-redfish
-   ```
-
-3. Update service file
-   ```bash
-   sed -i 's/User=root/User=proxmox-redfish/' /etc/systemd/system/proxmox-redfish.service
-   sed -i 's/Group=root/Group=proxmox-redfish/' /etc/systemd/system/proxmox-redfish.service
-
-   # Reload and restart
-   systemctl daemon-reload
-   systemctl restart proxmox-redfish
-   ```
+A caller may present a password or an API token; both are ordinary Basic
+authentication. See [API tokens](#api-tokens) for how a token differs,
+which matters more than it looks.
 
 ## Monitoring and Logging
 
@@ -799,10 +764,11 @@ Enable debug logging for troubleshooting:
 
 ## Security Best Practices
 
-1. **Use Dedicated Users**
-   - Create dedicated users for Redfish operations
-   - Use API tokens instead of passwords
-   - Implement least privilege access
+1. **Give each caller its own account**
+   - One account per thing that drives the daemon, not one shared account
+   - Grant it only the VMs it manages, and only the ISO storage it needs
+   - If you use an API token, grant the token itself -- it inherits
+     nothing from its owner
 
 2. **Secure SSL Configuration**
    - Use proper SSL certificates in production

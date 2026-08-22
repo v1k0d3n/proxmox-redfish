@@ -17,7 +17,7 @@ To make the examples easier to use, set up these environment variables with your
 
 ```bash
 # Set these variables with your actual values
-export REDFISH_USER="your-user@pam"
+export REDFISH_USER="your-user@pve"
 export REDFISH_PASS="your-password-or-api-token"
 export REDFISH_BASEURL="https://your-proxmox-host:8443"
 export REDFISH_VMID="100"

@@ -174,7 +174,6 @@ This guide will take you from a fresh Proxmox installation to a fully working Re
    VERIFY_SSL="false"
    EOF
    ```
-   **Important**: Replace `your-proxmox-root-password` with your actual Proxmox root password.
 
 8. Create a systemd service unit, if you installed by hand
 
@@ -322,11 +321,27 @@ A user-guide has been provided to assist with basic testing and vailidating your
 
 ## Security Notes
 
-- The daemon runs as root by default for full VM access (you may change this to a [PoLP](https://en.wikipedia.org/wiki/Principle_of_least_privilege) model if desired)
-- SSL certificates are self-signed by default (you can provide your own valid certificates if desired)
-- Consider using a dedicated user with limited permissions (through Roles/Permissions in Proxmox)
-- Always keep your Proxmox credentials secure
-- Regularly update the daemon and dependencies (as this project matures over time)
+- **The daemon holds no Proxmox account and stores no credentials.** Every
+  request is carried out as the caller, and Proxmox decides what that
+  caller may do. An account with no privileges authenticates and is then
+  refused everything.
+- **Granting the calling accounts is not optional.** Without a role and
+  the grants that go with it, the daemon authenticates a caller and every
+  operation returns 403. See
+  [docs/admins](docs/admins/README.md#proxmox-permissions).
+- **Root is not required.** The daemon needs no privilege on the host: it
+  performs Proxmox operations as the caller, and the ISO directory it
+  reads is world readable on a default install. The default unit runs as
+  root only because the TLS private key is; give a service account that
+  key and it runs unprivileged. See
+  [docs/admins](docs/admins/README.md#running-the-daemon-as-a-non-root-user).
+- **An API token is not a smaller password.** A token holds only what is
+  granted to the token itself, and when that is missing the failure is
+  quiet: authentication succeeds and the machines simply do not appear.
+- SSL certificates are self-signed unless you provide your own. Both
+  `SSL_CERT_FILE` and `SSL_KEY_FILE` must be set for TLS to be used;
+  setting one alone starts the daemon without it.
+- Keep the daemon and its dependencies current.
 
 ## License
 
