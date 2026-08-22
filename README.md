@@ -3,7 +3,7 @@
 [![CI/CD Pipeline](https://github.com/v1k0d3n/proxmox-redfish/workflows/CI%2FCD%20Pipeline/badge.svg)](https://github.com/v1k0d3n/proxmox-redfish/actions)
 [![Coverage](https://img.shields.io/badge/coverage-85%25-green.svg)](https://github.com/v1k0d3n/proxmox-redfish/actions)[![Python](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![Release](https://img.shields.io/badge/release-v0.2.0-blue.svg)](https://github.com/v1k0d3n/proxmox-redfish/releases/tag/v0.2.0)
+[![Release](https://img.shields.io/badge/release-v0.2.1-blue.svg)](https://github.com/v1k0d3n/proxmox-redfish/releases/tag/v0.2.1)
 
 A Redfish API daemon for managing Proxmox VMs, providing a standardized interface for VM operations through the Redfish protocol. This enables integration with tools like Metal3, Ironic, OpenShift ACM ZTP/GitOps, and other Redfish-compatible management solutions.
 
@@ -85,7 +85,7 @@ This guide will take you from a fresh Proxmox installation to a fully working Re
    To install a particular release rather than the default branch:
 
    ```bash
-   /tmp/proxmox-redfish/scripts/install.sh --version v0.2.0
+   /tmp/proxmox-redfish/scripts/install.sh --version v0.2.1
    ```
 
    Useful options: `--install-dir` to install elsewhere, `--skip-service` to
@@ -111,7 +111,7 @@ This guide will take you from a fresh Proxmox installation to a fully working Re
    </details>
 
    > **Replacing an earlier version.** This release is structured differently
-   > from anything before `v0.2.0` -- the daemon was a single script and is now
+   > from anything before `v0.2.1` -- the daemon was a single script and is now
    > an installed package. There is no in-place upgrade. Back up the old
    > directory and its unit file, then install fresh:
    >
