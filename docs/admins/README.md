@@ -242,32 +242,108 @@ an easy mistake to ship. Boot order is a disk option in Proxmox
 (`$diskoptions` in `PVE::API2::Qemu`), guarded by `VM.Config.Disk`, not
 `VM.Config.Options`.
 
+### Where to run these commands
+
+On any node. Proxmox has no management node -- every node is equal, and
+users, roles and ACLs live in `/etc/pve/user.cfg` on the cluster
+filesystem, which replicates to every node in real time. Running `pveum`
+on one node configures the whole cluster.
+
+The node has to have quorum. Without it `/etc/pve` is read only and these
+commands fail rather than half-apply.
+
 ### Setting up a Redfish account
 
-Create a role with exactly the privileges above:
+**1. Create the role.** It carries the six privileges above, and nothing
+else:
 
 ```bash
 pveum role add RedfishOperator --privs \
   "VM.Audit,VM.PowerMgmt,VM.Config.CDROM,VM.Config.Disk,Datastore.AllocateTemplate,Datastore.Audit"
 ```
 
-Create the user:
+**2. Create the user.** The `@pve` realm is a Proxmox account and needs
+nothing on the host. `@pam` delegates to a Linux user, so a `@pam` name
+with no matching system account is accepted here and then fails to
+authenticate:
 
 ```bash
-pveum user add bmcadmin@pve --password <password>
+pveum user add redfish@pve
+pveum passwd redfish@pve
 ```
 
-Grant it on the VMs it should manage, and on the ISO storage. Use
-`/vms/<vmid>` for a single VM or `/vms` for all of them:
+`pveum passwd` prompts. Passing `--password` to `user add` instead puts
+the password in your shell history and in the process list while it runs.
+
+**3. Grant the role.** Once per VM the account should manage, and once on
+the storage that holds ISOs:
 
 ```bash
-pveum acl modify /vms/101 --users bmcadmin@pve --roles RedfishOperator
-pveum acl modify /storage/local --users bmcadmin@pve --roles RedfishOperator
+pveum acl modify /vms/101 --users redfish@pve --roles RedfishOperator
+pveum acl modify /storage/local --users redfish@pve --roles RedfishOperator
 ```
+
+`/vms/101` grants one VM; `/vms` grants all of them. The storage path
+must name the storage the daemon is configured to use, its
+`PROXMOX_ISO_STORAGE`. Power and boot work without it, and virtual media
+fails partway through instead.
+
+**4. Check what landed.** The list is the whole picture -- which paths,
+which roles, which accounts:
+
+```bash
+pveum acl list
+```
+
+**5. Confirm the daemon agrees.** Ask it what the account can see:
+
+```bash
+curl -sk -u 'redfish@pve:<password>' \
+  https://proxmox.example.com:8443/redfish/v1/Systems
+```
+
+`Members@odata.count` should equal the number of VMs granted, and no
+more. Zero means the ACLs did not apply to this account. A 401 means the
+credentials are wrong, which is a different problem.
 
 In the web UI the same thing is *Datacenter → Permissions → Add → User
 Permission*, once with a `/vms/...` path and once with a `/storage/...`
 path. Roles are not path-specific, so one role serves both.
+
+### Adding accounts later
+
+The role is made once and reused. Another account needs only a user and
+its own grants:
+
+```bash
+pveum user add redfish2@pve
+pveum passwd redfish2@pve
+pveum acl modify /vms/102 --users redfish2@pve --roles RedfishOperator
+pveum acl modify /storage/local --users redfish2@pve --roles RedfishOperator
+```
+
+Several accounts can hold the same path, and one account can hold many
+paths. To widen an existing account, grant it another path; to narrow it,
+delete the grant you no longer want:
+
+```bash
+pveum acl delete /vms/101 --users redfish@pve --roles RedfishOperator
+```
+
+### Removing an account
+
+Grants first, then the account, then the role once nothing uses it:
+
+```bash
+pveum acl delete /vms/101 --users redfish@pve --roles RedfishOperator
+pveum acl delete /storage/local --users redfish@pve --roles RedfishOperator
+pveum user delete redfish@pve
+pveum role delete RedfishOperator
+```
+
+Deleting a user takes its API tokens with it. Its ACL entries do not go
+on their own, so remove those first or `pveum acl list` keeps showing
+them.
 
 ### API tokens
 
@@ -275,15 +351,33 @@ An API token works anywhere a password does, passed as Basic auth with
 the token id in the username:
 
 ```bash
-curl -k -u 'bmcadmin@pve!redfish:<token-value>' \
-  https://proxmox.example.com:8000/redfish/v1/Systems
+curl -k -u 'redfish@pve!bmc:<token-value>' \
+  https://proxmox.example.com:8443/redfish/v1/Systems
 ```
 
-Tokens are the better choice for automation: they are sent with each
-request and skip the ticket exchange a password requires. Grant the
-token the same privileges as above — by default a token is restricted to
-a subset of its user's rights, so check "Privilege Separation" or grant
-the token its own ACL entries.
+Tokens suit automation: they are sent with each request and skip the
+ticket exchange a password requires.
+
+**A token does not inherit its user's privileges.** Tokens are created
+with privilege separation on, which means the token holds only what has
+been granted to the token itself -- nothing from the account that owns
+it, even if that account is an administrator. The ACL goes on the token
+identity:
+
+```bash
+pveum acl modify /vms/101 --tokens 'redfish@pve!bmc' --roles RedfishOperator
+pveum acl modify /storage/local --tokens 'redfish@pve!bmc' --roles RedfishOperator
+```
+
+This is worth knowing before it happens to you, because of how it fails.
+Authentication succeeds. Nothing returns 401. `Systems` comes back empty,
+individual systems return 404, and the daemon looks like it cannot see
+any guests -- which reads as a daemon fault rather than a missing grant.
+If a token sees nothing, check `pveum acl list` for the token identity
+before looking anywhere else.
+
+A password account is the simpler choice for most people, because
+privilege separation cannot quietly strip it.
 
 ### Upgrading from a release before caller identity
 
