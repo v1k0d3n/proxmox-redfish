@@ -225,33 +225,54 @@ This guide will take you from a fresh Proxmox installation to a fully working Re
 
 ### Creating a Least-Privilege Redfish Account
 
-The daemon holds no Proxmox account of its own. Every request is performed
-using the credentials of the caller, so what a caller can do is decided by
-their Proxmox permissions. Create an account for whatever will drive the
-daemon, and grant it only what it needs:
+The daemon holds no Proxmox account of its own. Every request is carried
+out as the caller, so what a caller can do is decided by their Proxmox
+permissions, and an account with none authenticates and is then refused
+everything.
 
-1. In the Proxmox web interface
-   - Go to "Datacenter" → **Users**
-   - Click "Add" → **User**
-   - Create a user like `redfish@pam`
-   - Set a strong password
+Run these on any node -- users and permissions replicate across a cluster.
 
-2. Update the configuration
+1. Create a role holding what the daemon needs, and nothing else:
 
    ```bash
-   # Edit the configuration file
-   vi /opt/proxmox-redfish/config/params.env
-   
-   # The daemon holds no Proxmox account. Grant privileges to the accounts
-   # that will call the Redfish API instead -- see "Proxmox Permissions" in
-   # docs/admins.
+   pveum role add RedfishOperator --privs \
+     "VM.Audit,VM.PowerMgmt,VM.Config.CDROM,VM.Config.Disk,Datastore.AllocateTemplate,Datastore.Audit"
    ```
 
-3. Restart the service
+2. Create the account. Use the `@pve` realm -- it is a Proxmox account and
+   needs nothing on the host, where `@pam` requires a matching Linux user:
 
    ```bash
-   systemctl restart proxmox-redfish
+   pveum user add redfish@pve
+   pveum passwd redfish@pve
    ```
+
+3. Grant it the VMs it should manage, and the storage holding your ISOs:
+
+   ```bash
+   pveum acl modify /vms/101 --users redfish@pve --roles RedfishOperator
+   pveum acl modify /storage/local --users redfish@pve --roles RedfishOperator
+   ```
+
+   `/vms/101` is one VM, `/vms` is all of them. The storage must be the
+   one the daemon is configured to use.
+
+4. Confirm it worked:
+
+   ```bash
+   pveum acl list
+   curl -sk -u 'redfish@pve:<password>' \
+     https://proxmox.example.com:8443/redfish/v1/Systems
+   ```
+
+   `Members@odata.count` should equal the number of VMs you granted. Zero
+   means the grants did not apply.
+
+Adding more accounts later, using API tokens instead of a password, and
+removing an account are covered in
+[docs/admins](docs/admins/README.md#proxmox-permissions). Read the token
+section before using one: a token holds only what is granted to the token
+itself, and gets an empty `Systems` collection otherwise.
 
 ## Advanced Documentation
 
