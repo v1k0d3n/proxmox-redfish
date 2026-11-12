@@ -407,6 +407,14 @@ curl -k -u "${REDFISH_USER}:${REDFISH_PASS}" \
   "${REDFISH_BASEURL}/redfish/v1/Systems/${REDFISH_VMID}/EthernetInterfaces" | jq
 ```
 
+Each member (`net0` to `net3`) reports the address Proxmox assigned to that NIC as `MACAddress` and
+`PermanentMACAddress`:
+
+```bash
+curl -k -u "${REDFISH_USER}:${REDFISH_PASS}" \
+  "${REDFISH_BASEURL}/redfish/v1/Systems/${REDFISH_VMID}/EthernetInterfaces/net0" | jq .MACAddress
+```
+
 ## Complete Workflow Examples
 
 ### Example 1: Deploy a VM with ISO Boot

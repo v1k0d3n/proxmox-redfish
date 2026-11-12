@@ -2,7 +2,8 @@
 
 import base64
 import binascii
-from typing import Any, Dict, Tuple, Union
+import re
+from typing import Any, Dict, Optional, Tuple, Union
 
 from proxmoxer import ProxmoxAPI
 
@@ -444,6 +445,23 @@ def get_controller_collection(
         return handle_proxmox_error("Controller collection retrieval", e, vm_id)
 
 
+_MAC_RE = re.compile(r"^(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$")
+
+
+def parse_net_mac(raw: str) -> Optional[str]:
+    """Return the MAC address of a Proxmox `net<N>` option, or None when it carries none.
+
+    Proxmox writes the address as the value of the model key (`virtio=BC:24:11:00:00:01,bridge=vmbr0`); the
+    `macaddr=` spelling is what the API accepts on input. The address is returned upper case and colon separated,
+    which is how Proxmox stores it and one of the forms Redfish allows for MACAddress.
+    """
+    for part in str(raw).split(","):
+        _, sep, value = part.partition("=")
+        if sep and _MAC_RE.match(value.strip()):
+            return value.strip().upper()
+    return None
+
+
 def get_ethernet_interface_collection(
     proxmox: ProxmoxAPI, vm_id: int
 ) -> Union[Dict[str, Any], Tuple[Dict[str, Any], int]]:
@@ -497,6 +515,11 @@ def get_ethernet_interface_detail(
             "Name": f"Interface {interface_id}",
             "Status": {"State": "Enabled", "Health": "OK"},
         }
+        # A virtual NIC has one address: the one in the VM configuration is both the current and the permanent one.
+        mac = parse_net_mac(config[interface_id])
+        if mac:
+            response["MACAddress"] = mac
+            response["PermanentMACAddress"] = mac
         return response
     except Exception as e:
         return handle_proxmox_error("Ethernet interface detail retrieval", e, vm_id)
